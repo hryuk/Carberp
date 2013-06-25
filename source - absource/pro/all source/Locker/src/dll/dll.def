@@ -1,0 +1,8 @@
+LIBRARY	locker
+
+EXPORTS   
+  InitializeAPI
+  F1 = Export_StartNonIeTopWindowProcessesKilling
+  F2 = Export_StartIeMsgFilterInjecting
+  F3 = Export_StartWinlogonBlockInjecting
+  F4 = Export_StartBanner

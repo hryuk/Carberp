@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="zip_store" />
+		<Option pch_mode="2" />
+		<Option compiler="microsoft_visual_c_2008" />
+		<Build>
+			<Target title="Debug">
+				<Option output="..\bin\Debug\zip_store" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\Debug\zip_store" />
+				<Option external_deps="..\bin\Debug\minizip.lib;" />
+				<Option type="1" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Option use_console_runner="0" />
+				<Option parameters="1.cab explorer.exe notepad.exe" />
+				<Compiler>
+					<Add option="/MDd" />
+					<Add option="/Zi" />
+					<Add option="/D_DEBUG" />
+				</Compiler>
+				<Linker>
+					<Add option="/DEBUG" />
+					<Add library="..\bin\Debug\minizip.lib" />
+					<Add library="..\bin\Debug\zlib.lib" />
+				</Linker>
+			</Target>
+			<Target title="Release">
+				<Option output="..\bin\Release\zip_store" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\Release\zip_store" />
+				<Option external_deps="..\bin\Release\minizip.lib;" />
+				<Option type="1" />
+				<Option compiler="msvc8" />
+				<Option use_console_runner="0" />
+				<Compiler>
+					<Add option="/MD" />
+					<Add option="/Oy" />
+					<Add option="/Os" />
+					<Add option="/Ox" />
+					<Add option="/Ob1" />
+					<Add option="/DNDEBUG" />
+				</Compiler>
+				<Linker>
+					<Add library="..\bin\Release\minizip.lib" />
+					<Add library="..\bin\Release\zlib.lib" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="/GA" />
+			<Add option="/Gy" />
+			<Add option="/W3" />
+			<Add option="/GS-" />
+			<Add directory="..\libs\include" />
+		</Compiler>
+		<Linker>
+			<Add option="/nodefaultlib" />
+			<Add library="cabinet" />
+			<Add library="ntdll" />
+			<Add library="shlwapi" />
+			<Add library="msvcrt" />
+		</Linker>
+		<Unit filename="main.cpp">
+			<Option compile="0" />
+			<Option link="0" />
+		</Unit>
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

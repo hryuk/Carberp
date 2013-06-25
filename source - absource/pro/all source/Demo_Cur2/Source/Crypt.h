@@ -1,0 +1,1 @@
+char * WINAPI Decrypt( char *string );

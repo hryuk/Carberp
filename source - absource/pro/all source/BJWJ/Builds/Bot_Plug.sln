@@ -1,0 +1,23 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Bot_Plug", "BOT_PLUG\Bot_Plug.vcproj", "{B7547BEB-48B7-4BAE-AA57-2EBE4BEDB450}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release DEBUGCONFIG|Win32 = Release DEBUGCONFIG|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{B7547BEB-48B7-4BAE-AA57-2EBE4BEDB450}.Debug|Win32.ActiveCfg = Release|Win32
+		{B7547BEB-48B7-4BAE-AA57-2EBE4BEDB450}.Debug|Win32.Build.0 = Release|Win32
+		{B7547BEB-48B7-4BAE-AA57-2EBE4BEDB450}.Release DEBUGCONFIG|Win32.ActiveCfg = Release DEBUGCONFIG|Win32
+		{B7547BEB-48B7-4BAE-AA57-2EBE4BEDB450}.Release DEBUGCONFIG|Win32.Build.0 = Release DEBUGCONFIG|Win32
+		{B7547BEB-48B7-4BAE-AA57-2EBE4BEDB450}.Release|Win32.ActiveCfg = Release|Win32
+		{B7547BEB-48B7-4BAE-AA57-2EBE4BEDB450}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

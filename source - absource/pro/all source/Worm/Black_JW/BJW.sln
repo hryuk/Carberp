@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual Studio 2005
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BJW", "BJW.vcproj", "{7040CF6D-9CC1-40A5-BFDC-E3524651EB6C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "peinf", "peinf\peinf.vcproj", "{61FACC45-757A-4B73-8174-F13365885182}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7040CF6D-9CC1-40A5-BFDC-E3524651EB6C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7040CF6D-9CC1-40A5-BFDC-E3524651EB6C}.Debug|Win32.Build.0 = Debug|Win32
+		{7040CF6D-9CC1-40A5-BFDC-E3524651EB6C}.Release|Win32.ActiveCfg = Release|Win32
+		{7040CF6D-9CC1-40A5-BFDC-E3524651EB6C}.Release|Win32.Build.0 = Release|Win32
+		{61FACC45-757A-4B73-8174-F13365885182}.Debug|Win32.ActiveCfg = Debug|Win32
+		{61FACC45-757A-4B73-8174-F13365885182}.Debug|Win32.Build.0 = Debug|Win32
+		{61FACC45-757A-4B73-8174-F13365885182}.Release|Win32.ActiveCfg = Release|Win32
+		{61FACC45-757A-4B73-8174-F13365885182}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

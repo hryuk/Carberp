@@ -1,0 +1,70 @@
+
+
+BOOL KillProcess(DWORD pid,DWORD TimeOut )
+{
+const static DWORD MAX_COUNT_THREAD = 0x20;
+	THREADENTRY32	Thread;
+	HANDLE			hProcess;
+	HANDLE			hSnap;
+	DWORD			Threads[MAX_COUNT_THREAD] ;
+	
+	m_memset(Threads,0,sizeof(Threads));
+	m_memset(&Thread,0,sizeof(Thread));
+	Thread.dwSize = sizeof(Thread);
+
+	
+	if ( (hSnap = (HANDLE)pCreateToolhelp32Snapshot(TH32CS_SNAPTHREAD,pid)) == INVALID_HANDLE_VALUE  )
+	{
+		return FALSE;
+	};
+	
+	if ( pThread32First(hSnap,&Thread) )
+	{
+		DWORD i = 0;
+		do{
+			if ( (Thread.th32OwnerProcessID == pid) & ( i< MAX_COUNT_THREAD) )
+				Threads[i++] = Thread.th32ThreadID;
+
+		}while(pThread32Next(hSnap,&Thread));
+
+		pCloseHandle(hSnap);
+	}
+
+	if (! (hProcess = (HANDLE)pOpenProcess(SYNCHRONIZE | PROCESS_VM_WRITE|PROCESS_VM_OPERATION,FALSE,pid))  )
+		return FALSE;
+
+	for (DWORD i = 0; i<MAX_COUNT_THREAD; ++i)
+	if ( Threads[i] )
+	{
+		HANDLE	htmp;
+		CONTEXT ctx;
+
+		if (Threads[i] == (DWORD)pGetCurrentThreadId())
+			continue;
+
+		if ( ! (htmp = (HANDLE)pOpenThread(THREAD_GET_CONTEXT | THREAD_SUSPEND_RESUME,FALSE,Threads[i]))  )
+			continue;
+
+			pSuspendThread(htmp);
+			
+			ctx.ContextFlags = CONTEXT_CONTROL | CONTEXT_INTEGER;
+			if(pGetThreadContext(htmp,&ctx))
+			{
+				DWORD s;
+				DWORD TargetAddr;
+				PVOID new_addr = pGetProcAddress(pGetModuleHandleA("KERNEL32"),"ExitProcess");
+				TargetAddr = ctx.Ebp + sizeof(DWORD);
+				if ( (TargetAddr > 1024*1024 ) & (TargetAddr < 0x80000000) )  
+				{
+					pVirtualAllocEx(hProcess,TargetAddr,sizeof(new_addr),MEM_COMMIT,PAGE_READWRITE);
+					pWriteProcessMemory(hProcess,TargetAddr,&new_addr,sizeof(new_addr),&s);
+				};
+			};
+			pResumeThread(htmp);
+			pCloseHandle(htmp);
+		};
+	
+	BOOL ret = ( WAIT_OBJECT_0 == (DWORD)pWaitForSingleObject(hProcess,TimeOut) )? TRUE:FALSE;
+	pCloseHandle(hProcess);
+	return ret ;
+};

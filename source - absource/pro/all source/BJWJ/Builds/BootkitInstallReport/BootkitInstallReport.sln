@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BootkitInstallReport", "BootkitInstallReport.vcproj", "{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release DEBUGBOT|Win32 = Release DEBUGBOT|Win32
+		Release DEBUGCONFIG|Win32 = Release DEBUGCONFIG|Win32
+		Release_DLL|Win32 = Release_DLL|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}.Debug|Win32.ActiveCfg = Release|Win32
+		{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}.Debug|Win32.Build.0 = Release|Win32
+		{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}.Release DEBUGBOT|Win32.ActiveCfg = Release DEBUGBOT|Win32
+		{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}.Release DEBUGBOT|Win32.Build.0 = Release DEBUGBOT|Win32
+		{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}.Release DEBUGCONFIG|Win32.ActiveCfg = Release DEBUGCONFIG|Win32
+		{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}.Release DEBUGCONFIG|Win32.Build.0 = Release DEBUGCONFIG|Win32
+		{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}.Release_DLL|Win32.ActiveCfg = Release_DLL|Win32
+		{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}.Release_DLL|Win32.Build.0 = Release_DLL|Win32
+		{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}.Release|Win32.ActiveCfg = Release|Win32
+		{2ECC88E6-BD5C-436F-92C9-7AECD2233F0A}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

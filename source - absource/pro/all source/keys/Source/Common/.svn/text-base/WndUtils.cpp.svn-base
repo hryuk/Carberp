@@ -1,0 +1,191 @@
+//---------------------------------------------------------------------------
+
+#include "GetApi.h"
+#include "Memory.h"
+
+#include "WndUtils.h"
+
+//---------------------------------------------------------------------------
+
+void FreeWndProcInfoRec(LPVOID Data)
+{
+	// Уничтожить элемент списка  PWndProcInfo
+    FreeStruct(Data);
+}
+//---------------------------------------------------------------------------
+
+
+bool SubClassingSearcRec(WNDPROCLIST List, HWND Wnd, DWORD *Index, PWndProcInfo *Rec)
+{
+	// Функция ищет запись об оконной процедуре для указанного окна
+	if (Index != NULL)
+		*Index = 0;
+
+	if (Rec != NULL)
+		*Rec = NULL;
+
+	if (List == NULL || Wnd == NULL)
+		return false;
+
+	for (DWORD i = 0; i < List::Count(List); i++)
+    {
+		PWndProcInfo Info = (PWndProcInfo)List::GetItem(List, i);
+		if (Info->Window == Wnd)
+		{
+			if (Index != NULL)
+				*Index = i;
+			if (Rec != NULL)
+				*Rec = Info;
+			return true;
+		}
+	}
+
+	return false;
+}
+//---------------------------------------------------------------------------
+
+WNDPROCLIST SubClassing::CreateList()
+{
+	//	функция создаёт список хранения информации подмененых процедурах.
+	PList L = List::Create();
+	List::SetFreeItemMehod(L, FreeWndProcInfoRec);
+
+	return L;
+}
+//---------------------------------------------------------------------------
+
+PWndProcInfo SubClassing::SetWindowProc(WNDPROCLIST List, HWND Wnd, WNDPROC NewProc)
+{
+	// Функция подменяет оконную процедуру
+
+	if (List == NULL || Wnd == NULL || NewProc == NULL)
+		return NULL;
+
+    PWndProcInfo Rec = CreateStruct(TWndProcInfo);
+	if (Rec == NULL) return NULL;
+
+	Rec->Window = Wnd;
+	Rec->IsUnicode = pIsWindowUnicode(Wnd);
+
+	// Проверяем поток окна
+//	DWORD ProcID;
+//	DWORD ThreadID = (DWORD)pGetWindowThreadProcessId(Wnd,&ProcID);
+//	DWORD CurrentID = (DWORD)pGetCurrentThreadId();
+
+	// В случае если окно из другого процесса то подключаемся к
+	// его выводу
+
+//	if (CurrentID != ThreadID)
+//	{
+//		if (AttachThreadInput(CurrentID, ThreadID, true))
+//            CurrentID = 0;
+//    }
+
+
+	if (Rec->IsUnicode)
+    	Rec->OriginalProc = (WNDPROC)pSetWindowLongW(Wnd, GWL_WNDPROC, (DWORD)NewProc);
+	else
+		Rec->OriginalProc = (WNDPROC)pSetWindowLongA(Wnd, GWL_WNDPROC, (DWORD)NewProc);
+
+	if (Rec->OriginalProc != NULL)
+		List::Add(List, Rec);
+	else
+	{
+		FreeWndProcInfoRec(Rec);
+        Rec = NULL;
+    }
+	return Rec;
+}
+//---------------------------------------------------------------------------
+
+void SubClassing::RestoreWndProc(WNDPROCLIST List, HWND Wnd)
+{
+	// Функция восстанавливает оригинальную оконную процедуру
+
+	PWndProcInfo Rec;
+	DWORD Index;
+	if (!SubClassingSearcRec(List, Wnd, &Index, &Rec))
+		return;
+
+	if (Rec->OriginalProc != NULL)
+	{
+		if (Rec->IsUnicode)
+			pSetWindowLongW(Wnd, GWL_WNDPROC, (DWORD)Rec->OriginalProc);
+		else
+			pSetWindowLongA(Wnd, GWL_WNDPROC, (DWORD)Rec->OriginalProc);
+	}
+    List::Delete(List, Index);
+}
+//---------------------------------------------------------------------------
+
+LRESULT SubClassing::CallOriginalProc(WNDPROCLIST List, HWND Wnd, UINT Msg, WPARAM WParam, LPARAM LParam)
+{
+	//  Функция вызывает ориганальную оконную процедуру
+	PWndProcInfo Rec;
+	if (!SubClassingSearcRec(List, Wnd, NULL, &Rec))
+		return 0;
+
+	if (Rec->OriginalProc == NULL)
+		return 0;
+
+	if (Rec->IsUnicode)
+		return (LRESULT)pCallWindowProcW(Rec->OriginalProc,  Wnd, Msg, WParam, LParam);
+	else
+		return (LRESULT)pCallWindowProcA(Rec->OriginalProc,  Wnd, Msg, WParam, LParam);
+}
+//---------------------------------------------------------------------------
+
+
+
+
+//****************************************************************************
+
+
+HWND AllocateWND(WNDPROC WndProc)
+{
+	// Функция создаёт окно
+	if (WndProc == NULL)
+		return NULL;
+
+
+    char ClassName[]= {'S', 't', 'C', 's', 't', 'S', 'i', 'n', 'g', 'l', 'W', 'n', 'd',  0};
+
+    WNDCLASS WC;
+    WC.style = 0;
+	WC.cbClsExtra = 0;
+	WC.cbWndExtra = 0;
+	WC.hIcon = 0;
+	WC.hbrBackground = (HBRUSH)(COLOR_BTNFACE + 1);
+	WC.lpszMenuName = 0;
+	WC.lpszClassName = ClassName;
+	WC.lpfnWndProc = WndProc;
+	WC.hInstance = (HINSTANCE)pGetModuleHandleW(NULL);
+	WC.hCursor = (HCURSOR)pLoadCursorW(NULL,IDC_ARROW);
+	pRegisterClassA(&WC);
+
+
+	return (HWND)pCreateWindowExA(WS_EX_APPWINDOW, ClassName, NULL,WS_OVERLAPPEDWINDOW+WS_CLIPCHILDREN,0,0,0,0,NULL,NULL, WC.hInstance, NULL);
+}
+//---------------------------------------------------------------------------
+
+
+
+PCHAR GetWNDText(HWND Wnd)
+{
+	// Функция возвращает текст окна
+	if (Wnd == NULL)
+		return NULL;
+
+	DWORD Len = (DWORD)pSendMessageA(Wnd, WM_GETTEXTLENGTH, 0, 0);
+
+	if (Len == 0)
+		return NULL;
+
+    PCHAR Str = STR::Alloc(Len);
+
+	pSendMessageA(Wnd, WM_GETTEXT, Len, Str);
+
+    return Str;
+}
+
+//---------------------------------------------------------------------------

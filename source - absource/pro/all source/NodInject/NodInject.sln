@@ -1,0 +1,32 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NodInject", "NodInject\NodInject.vcproj", "{056D42D1-B44D-4AAF-B914-A42FD672FF18}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "builder", "builder\builder.vcproj", "{7B98B00E-01F1-4FCC-BA47-C38739A5C315}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "noddriver2", "noddriver2\noddriver2.vcproj", "{39AEA913-E22C-49CF-B242-C4BE33B26AB1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{056D42D1-B44D-4AAF-B914-A42FD672FF18}.Debug|Win32.ActiveCfg = Debug|Win32
+		{056D42D1-B44D-4AAF-B914-A42FD672FF18}.Debug|Win32.Build.0 = Debug|Win32
+		{056D42D1-B44D-4AAF-B914-A42FD672FF18}.Release|Win32.ActiveCfg = Release|Win32
+		{056D42D1-B44D-4AAF-B914-A42FD672FF18}.Release|Win32.Build.0 = Release|Win32
+		{7B98B00E-01F1-4FCC-BA47-C38739A5C315}.Debug|Win32.ActiveCfg = Debug|Win32
+		{7B98B00E-01F1-4FCC-BA47-C38739A5C315}.Debug|Win32.Build.0 = Debug|Win32
+		{7B98B00E-01F1-4FCC-BA47-C38739A5C315}.Release|Win32.ActiveCfg = Release|Win32
+		{7B98B00E-01F1-4FCC-BA47-C38739A5C315}.Release|Win32.Build.0 = Release|Win32
+		{39AEA913-E22C-49CF-B242-C4BE33B26AB1}.Debug|Win32.ActiveCfg = Debug|Win32
+		{39AEA913-E22C-49CF-B242-C4BE33B26AB1}.Debug|Win32.Build.0 = Debug|Win32
+		{39AEA913-E22C-49CF-B242-C4BE33B26AB1}.Release|Win32.ActiveCfg = Release|Win32
+		{39AEA913-E22C-49CF-B242-C4BE33B26AB1}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

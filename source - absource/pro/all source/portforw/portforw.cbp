@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="port_forwarder" />
+		<Option pch_mode="2" />
+		<Option compiler="microsoft_visual_c_2008" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin\debug\portforw" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj\Debug" />
+				<Option type="1" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Option use_console_runner="0" />
+				<Compiler>
+					<Add option="/Zi" />
+					<Add option="/D_DEBUG" />
+				</Compiler>
+				<Linker>
+					<Add option="/DEBUG" />
+				</Linker>
+			</Target>
+			<Target title="Release">
+				<Option output="bin\Release\portforw" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj\Release" />
+				<Option type="1" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Option use_console_runner="0" />
+				<Compiler>
+					<Add option="/GA" />
+					<Add option="/Gy" />
+					<Add option="/Oy" />
+					<Add option="/Os" />
+					<Add option="/Ox" />
+					<Add option="/Og" />
+					<Add option="/DNDEBUG" />
+				</Compiler>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="/W3" />
+			<Add directory="$(#psdk.include)" />
+		</Compiler>
+		<Linker>
+			<Add option="/base:0x400000" />
+			<Add option="/SAFESEH:NO" />
+			<Add option="/ignore:4078" />
+			<Add option="/filealign:512" />
+			<Add option="/opt:ref" />
+			<Add option="/fixed:no" />
+			<Add library="kernel32" />
+			<Add library="ws2_32" />
+			<Add directory="$(#psdk.lib)" />
+		</Linker>
+		<Unit filename="main.cpp" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+			<lib_finder disable_auto="1" />
+			<DoxyBlocks>
+				<comment_style block="0" line="0" />
+				<doxyfile_project />
+				<doxyfile_build />
+				<doxyfile_warnings />
+				<doxyfile_output />
+				<doxyfile_dot />
+				<general />
+			</DoxyBlocks>
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

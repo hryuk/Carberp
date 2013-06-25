@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="libvncsrv 0.9.8.2" />
+		<Option pch_mode="2" />
+		<Option compiler="microsoft_visual_c_2008" />
+		<Build>
+			<Target title="Debug x86">
+				<Option output="$(WORKSPACEDIR)\bin\Debug\libvncsrv" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="" />
+				<Option object_output="$(WORKSPACEDIR)\obj\Debug\libvncsrv\" />
+				<Option type="2" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Option createDefFile="1" />
+				<Compiler>
+					<Add option="/Od" />
+					<Add option="/W3" />
+					<Add option="/Zi" />
+					<Add option="/DWIN32" />
+					<Add option="/D_DEBUG" />
+					<Add option="/D_LIB" />
+				</Compiler>
+				<Linker>
+					<Add option="/DEBUG" />
+				</Linker>
+			</Target>
+			<Target title="Release x86">
+				<Option output="$(WORKSPACEDIR)\bin\Release\libvncsrv" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="" />
+				<Option object_output="$(WORKSPACEDIR)\obj\Release\libvncsrv\" />
+				<Option type="2" />
+				<Option compiler="msvc8" />
+				<Option createDefFile="1" />
+				<Compiler>
+					<Add option="/arch:SSE2" />
+					<Add option="/arch:SSE" />
+					<Add option="/Oy" />
+					<Add option="/Os" />
+					<Add option="/Ox" />
+					<Add option="/W3" />
+					<Add option="/Ob1" />
+					<Add option="/DWIN32" />
+					<Add option="/DNDEBUG" />
+					<Add option="/D_LIB" />
+				</Compiler>
+			</Target>
+		</Build>
+		<VirtualTargets>
+			<Add alias="Debug" targets="Debug x86;" />
+			<Add alias="Release" targets="Release x86;" />
+		</VirtualTargets>
+		<Compiler>
+			<Add option="/GA" />
+			<Add option="/fp:except-" />
+			<Add option="/Gy" />
+			<Add option="/GS-" />
+			<Add directory="..\rfb" />
+			<Add directory=".." />
+			<Add directory="..\..\minizip\zlib" />
+			<Add directory="..\libvncsrv" />
+		</Compiler>
+		<Unit filename="auth.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="corre.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="cursor.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="cutpaste.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="d3des.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="d3des.h" />
+		<Unit filename="hextile.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="lzoconf.h" />
+		<Unit filename="main.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="minilzo.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="minilzo.h" />
+		<Unit filename="private.h" />
+		<Unit filename="rfbregion.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="rfbserver.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="rre.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="scale.c">
+			<Option compilerVar="CC" />
+			<Option compiler="microsoft_visual_c_2008" use="1" buildCommand="$compiler /nologo $options /QIfist $includes /c $file /Fo$object" />
+		</Unit>
+		<Unit filename="scale.h" />
+		<Unit filename="sockets.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="translate.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="ultra.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="vncauth.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="zlib.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="zrle.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="zrleoutstream.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="zrleoutstream.h" />
+		<Unit filename="zrlepalettehelper.c">
+			<Option compilerVar="CC" />
+		</Unit>
+		<Unit filename="zrlepalettehelper.h" />
+		<Unit filename="zrletypes.h" />
+		<Unit filename="..\rfb\keysym.h" />
+		<Unit filename="..\rfb\rfb.h" />
+		<Unit filename="..\rfb\rfbconfig.h" />
+		<Unit filename="..\rfb\rfbint.h" />
+		<Unit filename="..\rfb\rfbproto.h" />
+		<Unit filename="..\rfb\rfbregion.h" />
+		<Unit filename="..\rfb\stdint.h">
+			<Option target="&lt;{~None~}&gt;" />
+		</Unit>
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

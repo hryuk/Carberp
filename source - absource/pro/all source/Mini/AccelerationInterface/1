@@ -1,0 +1,73 @@
+Option   Meaning
+-A       All warnings will be active.
+-ansic   Disallow the language extensions of lcc-win32.
+-ansic90 Conform to ANSI 1990 standard. This option will disallow all C99
+         and link with crtdll.dll, the C90 standard linbrary. Long long
+         support doesn't exist, there is no optimizer, but programs are
+         30K smaller than C99 programs. Use the driver "lc.exe" for this
+         option. Note that // comments are NOT recognized if you use this
+         option.
+-D       Define the symbol following the D. Example:-DNODEBUG The symbol
+         NODEBUG is defined. Note: NO space between the D and the symbol
+-dd      Debug defines. This option will write in the standard output a list
+         of all preprocessor defines followed by the file name and line number
+         where they are defined. This allows to see which definition is used.
+-check   Check the given source for errors. No object file is generated.
+-E       Generate an intermediate file with the output of the preprocessor.
+         The output file name will be deduced from the input file name, i.e.,
+         for a compilation of foo.c you will obtain foo.i.
+-E+      Like the -E option, but instead of generating a #line xxx directive,
+         the preprocessor generates a # xxx directive.
+-EP      Like the -E option, but no #line directives will be generated.
+-errout= Append the warning/error messages to the indicated file.
+         Example -errout=Myexe.err. This will append to Myexe.err all
+         warnings and error messages.
+-eN      Set the maximum error count to N. Example:-e25.
+-fno-inline The inline directive is ignored.
+-Fo<file name> This forces the name of the output file.
+-g2      Generate the debugging information.
+-g3      Arrange for function stack tracing. If a trap occurs, the function
+         stack will be displayed.
+-g4      Arrange for function stack and line number tracing.
+-g5      Arrange for function stack, line number, and return call stack
+         corruption tracing.
+-I       Add a path to the path included, i.e. to the path the compiler follows
+         to find the header files. Example:-Ic:\project\headers. Note NO space
+         between the I and the following path.
+-libcdll Use declarations for lcclibc.dll.Files compiled with this option
+         should use the -dynamic option of the linker lcclnk.
+-M       Print in standard output the names of all files that the preprocessor
+         has opened when processing the given input file. No object file is
+         generated.
+-M1      Print in standard output each include file recursively, indicating
+         where it is called from, and when it is closed.
+-nw      No warnings will be emitted. Errors will be still printed.
+-O       Optimize the output. This activates the peephole optimizer.
+-o <file>Use as the name of the output file the given name. Identical to the
+         Fo flag above.
+-overflowcheck
+         Generate code to test for overflow for all additions, subtractions and
+         multiplications.
+-p6      Enable SSE3 instructions
+-p6=no   Disable SSE3 instructions
+-profile Inject code into the generated program to measure execution time.
+         This option is incompatible with debug level higher than 2.
+-S       Generate an assembly file. The output file name will be deduced from
+         the input file: for a compilation of foo.c you will obtain foo.asm.
+-s n     Set the switch density to n that must be a value between 0.0 and 1.0.
+         Example: -s 0.1
+-shadows Warn when a local variable shadows a global one.
+-stackinit n
+         Initialize the uninitialized stack at function entry with a value "n". 
+-U       Undefine the symbol following the U.
+-unused  Warns about unused assignments and suppresses the dead code.
+-v       Show compiler version and compilation date
+-z       Generate a file with the intermediate language of lcc. The name of the
+         generated file will have a .lil extension.
+-Zp[1,2,4,8,16] Set the default alignment in structures to one, two, four, etc.
+        If you set it to one, this actually means no alignment at all.
+-------------------------------------------------------------------------
+Command line options are case sensitive. Use either "-" or "/" to
+introduce an option in the command line.
+The compiler detects the type of machine used and will set the p6 flag automatically. Use
+the p6 flags in case you want to override detection.

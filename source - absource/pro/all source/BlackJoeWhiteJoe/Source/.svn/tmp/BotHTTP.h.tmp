@@ -1,0 +1,314 @@
+//---------------------------------------------------------------------------
+//  Модуль организации работы с HTTP протоколом
+//
+//  Версия 1.0
+//  Модифицирован: 12 января 2011
+//---------------------------------------------------------------------------
+
+
+//---------------------------------------------------------------------------
+
+
+#ifndef BotHTTPH
+#define BotHTTPH
+
+#include <windows.h>
+#include "Strings.h"
+
+// Названия основных методов HTTP запроса
+const PCHAR HTTPMethodGET = "GET";
+const PCHAR HTTPMethodPOST = "POST";
+const PCHAR HTTPMethodHEAD = "HEAD";
+const PCHAR HTTPMethodPUT = "PUT";
+const PCHAR HTTPMethodDELETE = "DELETE";
+const PCHAR HTTPMethodLINK = "LINK";
+const PCHAR HTTPMethodUNLINK = "UNLINK";
+const PCHAR HTTPMethodCONNECT = "CONNECT";
+const PCHAR HTTPMethodOPTIONS = "OPTIONS";
+const PCHAR HTTPMethodPATCH = "PATCH";
+const PCHAR HTTPMethodTRACE = "TRACE";
+
+
+// Основные версии HTTP протокола
+const PCHAR HTTPProtocolVersion_1_0 = "HTTP/1.0";
+const PCHAR HTTPProtocolVersion_1_1 = "HTTP/1.1";
+
+const PCHAR ProtocolHTTP  = "http";
+const PCHAR ProtocolHTTPS = "https";
+
+// Основные параметры HTTP заголовков
+const PCHAR ParamHost = "Host";
+const PCHAR ParamReferer = "Referer";
+const PCHAR ParamAccept = "Accept";
+const PCHAR ParamUserAgent = "User-Agent";
+const PCHAR ParamAcceptLanguage = "Accept-Language";
+const PCHAR ParamAcceptEncoding = "Accept-Encoding";
+const PCHAR ParamContentType = "Content-Type";
+const PCHAR ParamContentLength = "Content-Length";
+const PCHAR ParamCookie = "Cookie";
+const PCHAR ParamProxyConnection = "Proxy-Connection";
+const PCHAR ParamConnection = "Connection";
+const PCHAR ParamLocation = "Location";
+const PCHAR ParamAcceptRanges = "Accept-Ranges";
+const PCHAR ParamRange = "Range";
+const PCHAR ParamContentRange = "Content-Range";
+
+
+
+// Разделители строк
+const PCHAR LineBreak = "\r\n";
+const PCHAR LineBreak2 = "\r\n\r\n";
+const PCHAR ValueDelimeter = ": ";
+
+const PCHAR FormDataURLEncoded = "application/x-www-form-urlencoded";
+
+// Стандартные порты
+const WORD PortHTTP = 80;
+
+// Базовые значения параметров
+const PCHAR DefaultPath = "/";
+const PCHAR DefaultAccept = "*/*";
+const PCHAR DefaultAcceptLanguage = "ru";
+const PCHAR DefaultConnection = "Close";
+
+// Типы HTTP запросов
+enum THTTPMethod {hmUnknown, hmGET, hmPOST, hmHEAD};
+
+// Версия HTTP протокола
+enum THTTPProtocol {HTTP_1_0, HTTP_1_1};
+
+// Описание HTTP запроса
+typedef struct THTTPRequest
+{
+	THTTPMethod Method;         // Метод затпроса
+	PCHAR Host;                 // Имя запрашиваемого хоста
+	PCHAR Path;                 // Путь к документу
+    WORD  Port;                 // Порт удалённого сервера
+	PCHAR Referer;              // Адрес с которого идёт запрос
+	PCHAR Accept;               // Поддерживаемые типы файлов
+	PCHAR AcceptLanguage;       // Поддерживаемый язык
+	PCHAR ProxyConnection;      // Тип соединения
+	PCHAR UserAgent;            // Имя агента который делает запрос
+	PCHAR Cookie;               // Отправляемые куки
+	PCHAR ContentType;          // Тип отправляемых данных
+	DWORD ContentLength;        // Длина отправляемых данных
+	PCHAR PostData;				// Отправляемые данные
+	PCHAR Connection;           // Описание соединения
+	bool UseRange;              // Использовать пакетную загрузку
+	DWORD StartRange;           // Для докачки файлов - Стартовый байт
+	DWORD EndRange;             // Конечный байт закачки
+} *PHTTPRequest;
+
+
+// Описание ответа HTTP сервера
+typedef struct THTTPResponse
+{
+    PCHAR Protocol;        // Протокол ответа
+	DWORD Code;            // Код ответа сервера
+    PCHAR ResponseLine;    // Описание кода ответа
+	PCHAR ContentType;     // Тип загружаемых данных
+	DWORD ContentLength;   // Размер загружаемых данных
+	PCHAR AcceptRanges;    // Ответ на порционную закачку
+    PCHAR Connection;      // Информация о соединении
+	PCHAR Location;        // Адрес переадресации
+	DWORD StartRange;      // Начало блока в файле
+	DWORD EndRange;        // Конец блока в файле
+	DWORD FullSize;        // Полный размер файла
+} *PHTTPResponse;
+
+
+// Описание URL фдреса
+typedef struct TURL
+{
+    PCHAR Protocol;
+	PCHAR Host;
+	PCHAR Path;
+	PCHAR Document;
+	PCHAR Arguments;
+	PCHAR UserName;
+	PCHAR Password;
+	WORD Port;
+} *PURL;
+
+//----------------------------------------------------------------------------
+//  Функции для работы с запросами
+//----------------------------------------------------------------------------
+
+// Создать структуру запроса
+PHTTPRequest HTTPCreateRequest(PCHAR URL);
+
+// Создать структуру запроса
+void HTTPFreeRequest(PHTTPRequest Request);
+
+// Функция очищает структуру HTTP запроса
+void HTTPClearRequest(PHTTPRequest Request);
+
+// Функция заполняет не указанные поля структуры запроса стандартными данными
+void HTTPInitializeRequest(PHTTPRequest Request);
+
+// Функция разбирает HTTP запрос в структуру
+bool ParseHTTPRequest(PCHAR Buf, PHTTPRequest Request);
+
+// Вункция собирает строку запроса
+PCHAR HTTPBuildRequest(PHTTPRequest Request);
+
+// Заполнить  структуру запроса данными из адреса
+void HTTPSetRequestURL(PHTTPRequest Request, PCHAR URL);
+
+
+
+//*****************************************************************************
+//  HTTPResponse - Функции для работы с ответами HTTP сервера
+//*****************************************************************************
+namespace HTTPResponse
+{
+	//  Create - создать структуру ответа
+	PHTTPResponse Create();
+
+	//  Clear - очистить структуру ответа
+	void Clear(PHTTPResponse Response);
+
+	//  Free - уничтожить структуру ответа
+	void Free(PHTTPResponse Response);
+
+	//  Parse - парсить ответ сервера
+	bool Parse(PCHAR Buf, PHTTPResponse Response);
+}
+
+
+
+//----------------------------------------------------------------------------
+//  Дополнительные функции для работы с HTTP
+//----------------------------------------------------------------------------
+
+PCHAR GetMethodStr(THTTPMethod Kind); // получить строку метода по номеру
+THTTPMethod GetMethodFromStr(PCHAR Method);
+
+PCHAR URLEncode(PCHAR URL, DWORD URLSize = 0); // Кодировать URL строку
+void AddURLParam(PStrings S, PCHAR Name, PCHAR Value, DWORD ValueSize = 0); // кодирует значение и добавляет пару в список
+
+bool ParseURL(PCHAR URL, PURL Rec, bool FullPars = false); // Распарсить URL
+void ClearURL(PURL URL);
+
+bool ParseRequestFirstLine(PCHAR Line, PCHAR *Method, PCHAR *Path, PCHAR *ProtVersion);
+PCHAR GetHTTPHeaderValue(PCHAR Buf, PCHAR Name);
+PCHAR GetURLEncodedPostData(PCHAR Buf);
+
+<<<<<<< .mine
+//*****************************************************************************
+//  HTTPParser - Парсер HTTP данных
+//*****************************************************************************
+namespace HTTPParser
+{
+	bool ParseResponseLine(PCHAR Buf, PCHAR &Protocol, DWORD &Code, PCHAR &StatusLine);
+}
+
+=======
+//*****************************************************************************
+//  HTTPParser - Парсер HTTP данных
+//*****************************************************************************
+namespace HTTPParser
+{
+	bool ParseResponseLine(PCHAR Buf, PCHAR &Protocol, DWORD &Code, PCHAR &StatusLine);
+}
+
+//*****************************************************************************
+// Методы для работы с HTTP данными
+//*****************************************************************************
+namespace HTTPUtils
+{
+    PCHAR DeleteHeaderValue(PCHAR Buf, int &Size, PCHAR Header);
+}
+
+>>>>>>> .r109
+//----------------------------------------------------------------------------
+//  Функции для работы с буфером принятых данных
+//----------------------------------------------------------------------------
+typedef LPVOID PReceiveBuf;
+
+typedef struct TReceive
+{
+	LPVOID Data;
+	DWORD Size;
+} *PReceive;
+
+
+PReceiveBuf CreateReceiveBuf(); // Создать буфер приёма
+void FreeReceiveBuf(PReceiveBuf Buf); // Уничтожить буфер приёма
+void AddReceiveData(PReceiveBuf Buf, LPVOID Data, DWORD Size, bool Copy = true); // Добавить новую порцию данных
+LPBYTE BuildReceiveData(PReceiveBuf Buf, int &BufSize); // Собрать данные в один буфер
+PCHAR BuildReceiveDataStr(PReceiveBuf Buf, DWORD &BufSize); // Собрать данные в одну строку
+
+
+//***************************************************************************
+//
+//   Методы для работы с пост данными формата multy part form data
+//
+//***************************************************************************
+
+
+typedef LPVOID PMultiPartData;
+
+PMultiPartData MultiPardCreate();
+void MultiPartFree(PMultiPartData Data);
+void MultiPartAddField(PMultiPartData Data, PCHAR Name, PCHAR Value);
+
+
+//*****************************************************************************
+//  HTTP - методы выполнения HTTP запросов
+//*****************************************************************************
+
+namespace HTTP
+{
+	// Структура описания принимаемых данных
+	typedef struct TResponseData
+	{
+		PCHAR *Buffer;   // Указатель на переменную буфера приёма
+		DWORD *Size;     // Указатель на переменную размера принятых данных
+		PCHAR *Headers;  // Указатель на переменную хранения заголовоков ответа сервера
+        PHTTPResponse Response; // Структура ответа
+	}*PResponseData;
+
+	//********************************************************
+	//  ExecuteMethod - выполнить HTTP запрос к серверу
+	//********************************************************
+	bool ExecuteMethod(PHTTPRequest Request, HTTP::PResponseData Response);
+
+
+	//********************************************************
+	//  Get - отправить GET запрос
+	//
+	//  URL - адрес загружаемой страницы
+	//  Buf - Указатель на переменную строки. Переменная будет
+	//		  инициализирована во время выполнения функции
+	//        Если не указать, то метод не будет дожидаться
+	//		  ответа сервера.
+	//        Уничтожить функцией StrFree
+	//
+	//  Результат - Вернёт истину если удалось выполнить
+	//		запрос. Код ответа не проверяется
+	//********************************************************
+	bool Get(PCHAR URL, PCHAR *Buf);
+
+
+	//********************************************************
+	//  Post - отправить GET запрос
+	//
+	//  URL - адрес загружаемой страницы
+	//
+	//  Fields - POST данные запроса
+	//
+	//  Buf - Указатель на переменную строки. Переменная будет
+	//		  инициализирована во время выполнения функции
+	//        Если не указать, то метод не будет дожидаться
+	//		  ответа сервера.
+	//        Уничтожить функцией StrFree
+	//
+	//  Результат - Вернёт истину если удалось выполнить
+	//		запрос. Код ответа не проверяется
+	//********************************************************
+	bool Post(PCHAR URL, PStrings Fields, PCHAR *Buf);
+}
+
+//---------------------------------------------------------------------------
+#endif

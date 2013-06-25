@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_layout_file>
+	<ActiveTarget name="HVNC Release" />
+	<File name="crashrpt.cpp" open="1" top="0" tabpos="1">
+		<Cursor position="0" topLine="0" />
+	</File>
+	<File name="crashrpt.h" open="0" top="0" tabpos="2">
+		<Cursor position="0" topLine="0" />
+	</File>
+	<File name="injexe\inj.h" open="1" top="0" tabpos="4">
+		<Cursor position="325" topLine="0" />
+	</File>
+	<File name="injexe\main.cpp" open="1" top="1" tabpos="5">
+		<Cursor position="656" topLine="0" />
+	</File>
+	<File name="main.cpp" open="1" top="0" tabpos="3">
+		<Cursor position="3992" topLine="108" />
+	</File>
+	<File name="release.rc" open="0" top="0" tabpos="3">
+		<Cursor position="0" topLine="0" />
+	</File>
+	<File name="svchost_inj.cpp" open="0" top="0" tabpos="5">
+		<Cursor position="700" topLine="0" />
+	</File>
+	<File name="..\server\portforw.cpp" open="1" top="0" tabpos="2">
+		<Cursor position="1089" topLine="25" />
+	</File>
+</CodeBlocks_layout_file>

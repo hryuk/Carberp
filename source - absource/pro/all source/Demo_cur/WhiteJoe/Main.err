@@ -1,0 +1,21 @@
+Main.cpp(3): Error! E059: col(10) unable to open 'GetApi.h'
+Main.cpp(8): Error! E059: col(10) unable to open 'Utils.h'
+Main.cpp(10): Error! E059: col(10) unable to open 'BotUtils.h'
+Main.cpp(11): Error! E059: col(10) unable to open 'Rootkit.h'
+Main.cpp(12): Error! E059: col(10) unable to open 'Inject.h'
+Main.cpp(13): Error! E059: col(10) unable to open 'Unhook.h'
+Main.cpp(16): Error! E059: col(10) unable to open 'Crypt.h'
+Main.cpp(18): Error! E059: col(10) unable to open 'InternetExplorer.h'
+Main.cpp(19): Error! E059: col(10) unable to open 'Java.h'
+Main.cpp(20): Error! E059: col(10) unable to open 'KeyLogger.h'
+Main.cpp(21): Error! E059: col(10) unable to open 'web_money_dll.h'
+Main.cpp(23): Error! E059: col(10) unable to open 'ntdll.h'
+Main.cpp(25): Error! E059: col(10) unable to open 'coocksol.h'
+Main.cpp(26): Error! E059: col(10) unable to open 'AntiRapport.h'
+Main.cpp(29): Error! E059: col(10) unable to open 'md5.h'
+Main.cpp(65): Error! E006: col(37) syntax error; probable cause: missing ';'
+Main.cpp(70): Error! E029: col(5) symbol 'pRetrieveUrlCacheEntryStreamA' has not been declared
+Main.cpp(71): Error! E006: col(49) syntax error; probable cause: missing ';'
+Main.cpp(72): Error! E029: col(59) symbol 'lpCacheEntry' has not been declared
+Main.cpp(75): Error! E029: col(29) symbol 'pGetLastError' has not been declared
+Main.cpp(82): Error! E133: col(26) too many errors: compilation aborted

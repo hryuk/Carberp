@@ -1,0 +1,5 @@
+LIBRARY	"JavaShit"
+EXPORTS
+	DllMain
+	Java_sunw_util_AZJni_00024SendStringClass_sendString
+	

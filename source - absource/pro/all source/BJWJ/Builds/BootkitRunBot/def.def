@@ -1,0 +1,3 @@
+LIBRARY	"BootkitRunBot"
+EXPORTS 
+	Start;

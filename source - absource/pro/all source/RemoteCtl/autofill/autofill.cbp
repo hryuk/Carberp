@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="autofill" />
+		<Option pch_mode="2" />
+		<Option compiler="msvctk" />
+		<Build>
+			<Target title="Debug">
+				<Option output="bin\Debug\autofill" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj\Debug" />
+				<Option type="3" />
+				<Option compiler="msvctk" />
+				<Compiler>
+					<Add option="/Od" />
+					<Add option="/W3" />
+					<Add option="/Zi" />
+					<Add option="/DWIN32" />
+					<Add option="/D_DEBUG" />
+					<Add option="/D_WINDOWS" />
+				</Compiler>
+				<Linker>
+					<Add option="/DEBUG" />
+				</Linker>
+			</Target>
+			<Target title="Release">
+				<Option output="bin\Release\autofill" prefix_auto="1" extension_auto="1" />
+				<Option object_output="obj\Release" />
+				<Option type="3" />
+				<Option compiler="msvctk" />
+				<Compiler>
+					<Add option="/GA" />
+					<Add option="/Os" />
+					<Add option="/O1" />
+					<Add option="/W3" />
+					<Add option="/DWIN32" />
+					<Add option="/DNDEBUG" />
+					<Add option="/D_WINDOWS" />
+				</Compiler>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="/MD" />
+		</Compiler>
+		<Linker>
+			<Add option="/entry:main" />
+			<Add library="uuid" />
+			<Add library="shlwapi" />
+		</Linker>
+		<Unit filename="config.xml" />
+		<Unit filename="filler.cpp" />
+		<Unit filename="filler.h" />
+		<Unit filename="func.cpp" />
+		<Unit filename="func.h" />
+		<Unit filename="main.cpp" />
+		<Unit filename="std.h" />
+		<Unit filename="xml.cpp" />
+		<Unit filename="xml.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

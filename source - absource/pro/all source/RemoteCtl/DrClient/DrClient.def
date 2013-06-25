@@ -1,0 +1,4 @@
+LIBRARY DrClient.dll
+
+EXPORTS
+	StartClient

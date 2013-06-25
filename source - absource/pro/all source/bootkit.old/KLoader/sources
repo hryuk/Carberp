@@ -1,0 +1,32 @@
+TARGETNAME=kloader
+
+!if $(FREEBUILD) 
+TARGETPATH=Release
+!else
+TARGETPATH=Debug
+!endif
+
+TARGETTYPE = DRIVER
+
+!if "$(_BUILDARCH)"=="AMD64"
+TARGETLIBS = ..\x64\$(TARGETPATH)\bklib.lib	
+!else
+TARGETLIBS = ..\$(TARGETPATH)\bklib.lib
+!endif
+
+BUFFER_OVERFLOW_CHECKS=0
+C_DEFINES=$(C_DEFINES) /Gz
+
+!IF $(FREEBUILD)
+MSC_OPTIMIZATION = /O2 /Oi
+MSC_WARNING_LEVEL=/W3 /WX
+MSC_STDCALL = 1
+!ENDIF
+
+SOURCES=	kloader.c		\
+			handle.c		\
+			joiner.c		\
+			depack.c		\
+			stubs.c			\
+			krep.c
+					

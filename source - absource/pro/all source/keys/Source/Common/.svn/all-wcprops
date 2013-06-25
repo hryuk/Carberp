@@ -1,0 +1,239 @@
+K 25
+svn:wc:ra_dav:version-url
+V 60
+/svn/BlackJoe/!svn/ver/201/WhiteJOE_Serg/trunk/Source/Common
+END
+Rootkit.h
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/Rootkit.h
+END
+VideoRecorder.h
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/BlackJoe/!svn/ver/206/WhiteJOE_Serg/trunk/Source/Common/VideoRecorder.h
+END
+ScreenShots.h
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/ScreenShots.h
+END
+KeepAlive.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/KeepAlive.cpp
+END
+Loader.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/BlackJoe/!svn/ver/199/WhiteJOE_Serg/trunk/Source/Common/Loader.cpp
+END
+Task.h
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/Task.h
+END
+Firefox.h
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/Firefox.h
+END
+IECacheUtils.h
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/IECacheUtils.h
+END
+Unhook.h
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/Unhook.h
+END
+WndUtils.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/WndUtils.cpp
+END
+BotConfig.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/BotConfig.cpp
+END
+Requests.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/Requests.cpp
+END
+Opera.h
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/Opera.h
+END
+BotEvents.h
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/BotEvents.h
+END
+InternetExplorer.h
+K 25
+svn:wc:ra_dav:version-url
+V 79
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/InternetExplorer.h
+END
+CabPacker.h
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/CabPacker.h
+END
+UniversalKeyLogger.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 83
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/UniversalKeyLogger.cpp
+END
+AvBlock.h
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/AvBlock.h
+END
+Exploit.h
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/Exploit.h
+END
+Main.h
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/Main.h
+END
+Rootkit.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/BlackJoe/!svn/ver/197/WhiteJOE_Serg/trunk/Source/Common/Rootkit.cpp
+END
+VideoRecorder.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 78
+/svn/BlackJoe/!svn/ver/206/WhiteJOE_Serg/trunk/Source/Common/VideoRecorder.cpp
+END
+ScreenShots.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 76
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/ScreenShots.cpp
+END
+IECacheUtils.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 77
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/IECacheUtils.cpp
+END
+Firefox.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/Firefox.cpp
+END
+Task.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/199/WhiteJOE_Serg/trunk/Source/Common/Task.cpp
+END
+Unhook.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/BlackJoe/!svn/ver/205/WhiteJOE_Serg/trunk/Source/Common/Unhook.cpp
+END
+Opera.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/Opera.cpp
+END
+InternetExplorer.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/InternetExplorer.cpp
+END
+BotEvents.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/BlackJoe/!svn/ver/206/WhiteJOE_Serg/trunk/Source/Common/BotEvents.cpp
+END
+KeepAlive.h
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/KeepAlive.h
+END
+Loader.h
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/Loader.h
+END
+CabPacker.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 74
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/CabPacker.cpp
+END
+WndUtils.h
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/WndUtils.h
+END
+BotConfig.h
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/BotConfig.h
+END
+Requests.h
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/Requests.h
+END
+AvBlock.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/AvBlock.cpp
+END
+Exploit.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Common/Exploit.cpp
+END
+UniversalKeyLogger.h
+K 25
+svn:wc:ra_dav:version-url
+V 81
+/svn/BlackJoe/!svn/ver/198/WhiteJOE_Serg/trunk/Source/Common/UniversalKeyLogger.h
+END

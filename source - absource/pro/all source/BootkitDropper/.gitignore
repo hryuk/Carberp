@@ -1,0 +1,16 @@
+build/Release/*
+nbuild/OutDir/*
+.svn/*
+_projects_vs_2008/*.pdb/*
+obj/*
+Bin/*
+Obj/*
+*.user
+*.depend
+*.layout
+*.ncb
+*.opt
+*.aps
+*.plg
+*.suo
+*~

@@ -1,0 +1,12 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include <windows.h>
+#include "res.h"
+
+// ƒл€ того, чтобы заработало встраивание строк в EXE, необходимо 
+// наличии хоть каких-то ресурсов. ¬ отличии от DLL - не работает.
+
+STRINGTABLE
+BEGIN
+   IDR_ANY_RESOURCE    ""
+END 

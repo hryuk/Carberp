@@ -1,0 +1,103 @@
+# depslib dependency file v1.0
+1322655202 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\dropper.cpp
+	"includes.h"
+	"dropper.h"
+	"bot\system.h"
+
+1322655202 e:\projects\progs\petrosjan\remotectl\hvnc\core\includes.h
+	<winsock2.h>
+	<windows.h>
+	<tlhelp32.h>
+	<syslib.h>
+	<minizip.h>
+	<shlwapi.h>
+	<hvnc.h>
+	"defines.h"
+
+1322650725 e:\projects\progs\petrosjan\remotectl\hvnc\libs\include\syslib.h
+
+1322650724 e:\projects\progs\petrosjan\remotectl\hvnc\libs\include\minizip.h
+
+1327665741 e:\projects\progs\petrosjan\remotectl\hvnc\libs\include\hvnc.h
+
+1322655202 e:\projects\progs\petrosjan\remotectl\hvnc\core\defines.h
+
+1322655202 e:\projects\progs\petrosjan\remotectl\hvnc\core\dropper.h
+
+1322655202 e:\projects\progs\petrosjan\remotectl\hvnc\core\bot\system.h
+
+1330772323 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\func.cpp
+	"includes.h"
+	"func.h"
+
+1330772323 e:\projects\progs\petrosjan\remotectl\hvnc\core\func.h
+
+1330772323 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\main.cpp
+	"includes.h"
+	"svchost_inj.h"
+	"bot\system.h"
+	"dropper.h"
+	"crashrpt.h"
+	"func.h"
+	<hvnc.h>
+
+1322655202 e:\projects\progs\petrosjan\remotectl\hvnc\core\svchost_inj.h
+
+1322655202 e:\projects\progs\petrosjan\remotectl\hvnc\core\crashrpt.h
+	<dbghelp.h>
+
+1330772323 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\svchost_inj.cpp
+	<windows.h>
+	<ntdll.h>
+	<intrin.h>
+	<syslib.h>
+	"defines.h"
+
+1317046229 e:\projects\progs\petrosjan\remotectl\ntdll\ntdll.h
+	<stdarg.h>
+	<winbase.h>
+	<windef.h>
+
+1330772323 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\crashrpt.cpp
+	"includes.h"
+	<intrin.h>
+	"crashrpt.h"
+	"dropper.h"
+	"bot\system.h"
+
+1329845873 source:e:\projects\progs\petrosjan\remotectl\hvnc\server\portforw.cpp
+	<winsock2.h>
+	<windows.h>
+	<shlwapi.h>
+	<shlobj.h>
+
+1330772323 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\injexe\main.cpp
+	<windows.h>
+	<shlwapi.h>
+	<ntdll.h>
+	<syslib.h>
+	<hvnc.h>
+	<ntdll.h>
+	<tlhelp32.h>
+	"..\svchost_inj.h"
+	"..\func.h"
+	"..\crashrpt.h"
+	"..\defines.h"
+	"..\bot\system.h"
+	"inj.h"
+	<Uxtheme.h>
+
+1322939916 e:\projects\progs\petrosjan\remotectl\hvnc\libs\include\ntdll.h
+	<stdarg.h>
+	<winbase.h>
+	<windef.h>
+
+1322655202 e:\projects\progs\petrosjan\remotectl\hvnc\core\injexe\inj.h
+
+1330772325 e:\projects\progs\petrosjan\remotectl\hvnc\libs\system\syslib.h
+	<yvals.h>
+
+1330772324 e:\projects\progs\petrosjan\remotectl\hvnc\libs\minizip\minizip\minizip.h
+
+1330772326 e:\projects\progs\petrosjan\remotectl\hvnc\libs\hvnc\hvnc\hvnc.h
+

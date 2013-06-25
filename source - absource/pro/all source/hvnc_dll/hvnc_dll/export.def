@@ -1,0 +1,3 @@
+LIBRARY	"hvnc_dll"
+EXPORTS
+	Start

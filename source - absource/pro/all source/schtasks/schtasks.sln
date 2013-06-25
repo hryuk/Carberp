@@ -1,0 +1,20 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "schtasks", "schtasks.vcproj", "{ECF72C40-3498-49B3-AB62-D3B571A85688}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{ECF72C40-3498-49B3-AB62-D3B571A85688}.Debug|Win32.ActiveCfg = Debug|Win32
+		{ECF72C40-3498-49B3-AB62-D3B571A85688}.Debug|Win32.Build.0 = Debug|Win32
+		{ECF72C40-3498-49B3-AB62-D3B571A85688}.Release|Win32.ActiveCfg = Release|Win32
+		{ECF72C40-3498-49B3-AB62-D3B571A85688}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

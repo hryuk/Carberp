@@ -1,0 +1,29 @@
+#ifndef HunterH
+#define HunterH
+//----------------------------------------------------------------------------
+#include <windows.h>
+
+//void IsBankHunter( HINTERNET hRequest );
+//void StartHunt();
+//DWORD WINAPI RunHuntThred( LPVOID lpData );
+//void Hunting();
+
+
+// Максимальный размер буфера для хранения ссылок (включая нулевые символы)
+#define MAX_HUNTER_LINKS_SIZE 1024
+
+namespace URLHunter
+{
+	// Инициализируем данные хантера
+	void Initialize();
+
+	// Запускаем клиент ожидание события охотника
+	// Возможен запуск в другом процессе
+    void StartClient();
+
+	// Проверить совпадение ссылки с любой ссылкой из списка ссылок охотника
+    void CheckURL(PCHAR URL);
+}
+
+//----------------------------------------------------------------------------
+#endif

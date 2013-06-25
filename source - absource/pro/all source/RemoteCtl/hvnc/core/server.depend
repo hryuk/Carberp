@@ -1,0 +1,87 @@
+# depslib dependency file v1.0
+1332020450 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\func.cpp
+	"includes.h"
+	"func.h"
+
+1332020450 e:\projects\progs\petrosjan\remotectl\hvnc\core\includes.h
+	<winsock2.h>
+	<windows.h>
+	<tlhelp32.h>
+	<syslib.h>
+	<minizip.h>
+	<shlwapi.h>
+	<hvnc.h>
+	"defines.h"
+
+1332020451 e:\projects\progs\petrosjan\remotectl\hvnc\libs\system\syslib.h
+	<yvals.h>
+
+1332020451 e:\projects\progs\petrosjan\remotectl\hvnc\libs\minizip\minizip\minizip.h
+
+1332020454 e:\projects\progs\petrosjan\remotectl\hvnc\libs\hvnc\hvnc\hvnc.h
+
+1332020450 e:\projects\progs\petrosjan\remotectl\hvnc\core\defines.h
+
+1332020449 e:\projects\progs\petrosjan\remotectl\hvnc\core\func.h
+
+1332020450 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\crashrpt.cpp
+	"includes.h"
+	<intrin.h>
+	"crashrpt.h"
+	"dropper.h"
+	"bot\system.h"
+
+1332020450 e:\projects\progs\petrosjan\remotectl\hvnc\core\crashrpt.h
+	<dbghelp.h>
+
+1332020450 e:\projects\progs\petrosjan\remotectl\hvnc\core\dropper.h
+
+1332020449 e:\projects\progs\petrosjan\remotectl\hvnc\core\bot\system.h
+
+1332020450 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\svchost_inj.cpp
+	<windows.h>
+	<ntdll.h>
+	<intrin.h>
+	<syslib.h>
+	"defines.h"
+
+1332020449 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\injexe\main.cpp
+	<windows.h>
+	<shlwapi.h>
+	<ntdll.h>
+	<syslib.h>
+	<hvnc.h>
+	<ntdll.h>
+	<tlhelp32.h>
+	"..\svchost_inj.h"
+	"..\func.h"
+	"..\crashrpt.h"
+	"..\defines.h"
+	"..\bot\system.h"
+	"inj.h"
+	<Uxtheme.h>
+
+1332020449 e:\projects\progs\petrosjan\remotectl\hvnc\core\svchost_inj.h
+
+1332020449 e:\projects\progs\petrosjan\remotectl\hvnc\core\injexe\inj.h
+
+1332020450 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\dropper.cpp
+	"includes.h"
+	"dropper.h"
+	"bot\system.h"
+
+1335380977 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\main.cpp
+	"includes.h"
+	"svchost_inj.h"
+	"bot\system.h"
+	"dropper.h"
+	"crashrpt.h"
+	"func.h"
+	<hvnc.h>
+
+1342641545 source:e:\projects\progs\petrosjan\remotectl\hvnc\core\portforw.cpp
+	<winsock2.h>
+	<windows.h>
+	<shlwapi.h>
+	<shlobj.h>
+

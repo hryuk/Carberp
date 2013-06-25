@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_layout_file>
+	<ActiveTarget name="Release x86" />
+	<File name="hde64\hde64.cpp" open="1" top="0" tabpos="7">
+		<Cursor position="165" topLine="0" />
+	</File>
+	<File name="hook_api.h" open="0" top="0" tabpos="2">
+		<Cursor position="0" topLine="0" />
+	</File>
+	<File name="inject.cpp" open="1" top="0" tabpos="6">
+		<Cursor position="821" topLine="0" />
+	</File>
+	<File name="system.cpp" open="1" top="0" tabpos="8">
+		<Cursor position="10879" topLine="339" />
+	</File>
+</CodeBlocks_layout_file>

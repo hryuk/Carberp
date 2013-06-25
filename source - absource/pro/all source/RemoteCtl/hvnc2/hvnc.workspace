@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_workspace_file>
+	<Workspace title="hvnc_mop_branch">
+		<Project filename="libs/minizip/zlib/zlib.cbp" />
+		<Project filename="libs/hvnc/libvncsrv/libvncsrv.cbp" />
+		<Project filename="libs/minizip/minizip/minizip.cbp" />
+		<Project filename="libs/system/system.cbp" />
+		<Project filename="libs/hvnc/hvnc/hvnc.cbp" />
+		<Project filename="core/server.cbp" active="1" />
+	</Workspace>
+</CodeBlocks_workspace_file>

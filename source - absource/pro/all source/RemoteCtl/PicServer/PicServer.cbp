@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="PicServer" />
+		<Option pch_mode="2" />
+		<Option compiler="microsoft_visual_c_2008" />
+		<Build>
+			<Target title="Debug">
+				<Option output="..\bin\debug\PicServer" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\debug\PicServer" />
+				<Option type="1" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/MDd" />
+					<Add option="/Od" />
+					<Add option="/W3" />
+					<Add option="/Zi" />
+					<Add option="/DWIN32" />
+					<Add option="/D_DEBUG" />
+					<Add option="/D_CONSOLE" />
+				</Compiler>
+				<Linker>
+					<Add option="/DEBUG" />
+					<Add library="ws2_32" />
+				</Linker>
+			</Target>
+			<Target title="Release">
+				<Option output="..\bin\release\PicServer" prefix_auto="1" extension_auto="1" />
+				<Option object_output="..\obj\release\PicServer" />
+				<Option type="1" />
+				<Option compiler="microsoft_visual_c_2008" />
+				<Compiler>
+					<Add option="/MD" />
+					<Add option="/W3" />
+					<Add option="/DWIN32" />
+					<Add option="/DNDEBUG" />
+					<Add option="/D_CONSOLE" />
+				</Compiler>
+				<Linker>
+					<Add option="/INCREMENTAL:NO" />
+					<Add library="ws2_32" />
+				</Linker>
+			</Target>
+		</Build>
+		<Compiler>
+			<Add option="/DUNICODE" />
+			<Add option="/D_UNICODE" />
+			<Add directory="..\PicServer" />
+		</Compiler>
+		<Linker>
+			<Add library="user32" />
+			<Add library="kernel32" />
+		</Linker>
+		<Unit filename="PicServer.cpp" />
+		<Unit filename="stdafx.cpp" />
+		<Unit filename="stdafx.h" />
+		<Unit filename="..\common\ws2help.cpp" />
+		<Unit filename="..\common\ws2help.h" />
+		<Extensions>
+			<code_completion />
+			<envvars />
+			<debugger />
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

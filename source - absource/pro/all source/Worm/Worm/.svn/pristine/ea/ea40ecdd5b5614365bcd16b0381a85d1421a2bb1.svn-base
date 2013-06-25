@@ -1,0 +1,613 @@
+-- © 2008 Daniel Pistelli. All rights reserved.
+-- PE Validator Script Version: 1.0.0.1 for CFF explorer
+
+-- Checks:
+--
+-- check CRC32 (useful for drivers)
+-- check number of rva and sizes
+-- check image size
+-- check sections
+-- check that EP is valid
+-- check that EP is in code
+-- check that the EP section is executable
+-- check data directories RVAs
+-- check whether the API IsDebuggerPresent is imported
+
+-- this function checks if a flag is set
+function IsFlag(value, flag)
+	if (value & flag) == flag then
+		return true
+	end
+	return false
+end
+
+-- shows an invalid PE Msgbox
+function InvPEMsg()
+	MsgBox("The current file seems to be an invalid PE. Cannot proceed!",
+		strScriptName, MB_ICONEXCLAMATION)
+end
+
+-- adds a string to the report
+function AddReport(strReportLine)
+	strReport = strReport .. "- " .. strReportLine .. "\r\n"
+end
+
+-- compares two arrays
+function ArrayCompare(a, b)
+
+	if #a != #b then
+		return false
+	end
+	
+	local n = 0
+	
+	for n = 0, #a - 1 do
+	
+		if a[n] != b[n] then
+			return false
+		end
+		
+	end
+	
+	return true
+end
+
+function max(a, b)
+	if a > b then
+		return a
+	end
+	return b
+end
+
+function min(a, b)
+	if a < b then
+		return a
+	end
+	return b
+end
+
+
+-- this function checks if an import does exist in a PE file
+function CheckImportPresent(pehandle, ImportOrdinal, ImportName)
+
+	-- get Import Directory offset if any
+
+	local itoffset = GetOffset(pehandle, PE_ImportDirectory)
+
+	-- check if it's a valid PE and has a IT
+	if itoffset == null then
+		-- CloseHandle is really not necessary,
+		-- since the file will be automatically closed
+		return false
+	end
+
+	-- sets additional definition
+
+	local ImportDescriptorSize = 20
+
+	-- walk through the Import Directory
+
+	local nCurrentDescr = 0
+
+	local FirstThunk = ReadDword(pehandle, itoffset + 16)
+
+
+	while FirstThunk != 0 do
+
+		local CurImpDescrName = (nCurrentDescr * ImportDescriptorSize) + itoffset + 12
+
+		local ModNameOffset = RvaToOffset(pehandle, ReadDword(pehandle, CurImpDescrName))
+
+
+		local ModName = ReadString(pehandle, ModNameOffset)
+
+		local OFTs = ReadDword(pehandle, itoffset + (nCurrentDescr * ImportDescriptorSize))
+
+		-- use OFTs or FTs
+
+		local Thunks = 0
+
+		if OFTs != 0 then
+			Thunks = RvaToOffset(pehandle, OFTs)
+		else
+			Thunks = RvaToOffset(pehandle, FirstThunk)
+		end
+
+		-- list functions
+
+		local bPE64 = IsPE64(pehandle)
+
+		local CurThunkOffset = Thunks
+
+		local CurThunk = 0
+
+		if bPE64 == true then
+			CurThunk = ReadQword(pehandle, CurThunkOffset)
+		else
+			CurThunk = ReadDword(pehandle, CurThunkOffset)
+		end
+
+
+		while CurThunk != null and CurThunk != 0 do
+
+			-- check if it's ordinal only
+
+			local bOrdinal = false
+
+			if bPE64 == true then
+				bOrdinal = IsFlag(CurThunk, IMAGE_ORDINAL_FLAG64)
+			else
+				bOrdinal = IsFlag(CurThunk, IMAGE_ORDINAL_FLAG32)
+			end	
+
+			local Ordinal = -1
+			local FuncName = ""
+
+			if bOrdinal == true then
+
+				Ordinal = ReadWord(pehandle, CurThunkOffset)
+
+			else
+
+				FuncOffset = RvaToOffset(pehandle, (CurThunk & 0xFFFFFFFF))
+
+				Ordinal = ReadWord(pehandle, FuncOffset)
+
+				FuncName = ReadString(pehandle, FuncOffset + 2)
+
+			end
+
+			if bOrdinal != true and ImportName != null and FuncName != null then
+
+				if ImportName == FuncName then
+					return true
+				end
+
+			end
+
+			if bOrdinal == false and ImportOrdinal != 0 then
+				
+				if Ordinal == ImportOrdinal then
+					return true
+				end
+			end 
+
+			-- next thunk
+
+			if bPE64 == true then
+				CurThunkOffset = CurThunkOffset + 8
+				CurThunk = ReadQword(pehandle, CurThunkOffset)
+			else
+				CurThunkOffset = CurThunkOffset + 4
+				CurThunk = ReadDword(pehandle, CurThunkOffset)
+			end
+			
+		end
+	
+
+		-- next import descriptor
+
+		nCurrentDescr = nCurrentDescr + 1
+
+		local NextImportDescr = (itoffset + (nCurrentDescr * ImportDescriptorSize)) + 16
+
+		FirstThunk = ReadDword(pehandle, NextImportDescr)
+
+	end
+
+	return false
+
+end
+
+
+-- --------------------------------------------------
+-- the main code starts here
+-- --------------------------------------------------
+
+strScriptName = "PE Validator Script 1.0.0.1 - by Daniel Pistelli"
+
+local filename = GetOpenFile("Select a PE to check...", "All\n*.*\nExe Files\n*.exe\nDll Files\n*.dll\n")
+
+if filename == null then
+	return
+end
+
+local hOriginalPE = OpenFile(filename)
+
+if hOriginalPE == null then
+	MsgBox("Couldn't open file.", "Error", MB_ICONEXCLAMATION)
+	return
+end
+
+local OptHdrOffset = GetOffset(hOriginalPE, PE_OptionalHeader)
+
+if OptHdrOffset == null then
+	InvPEMsg()
+	return
+end
+
+local hModPE = OpenFile(filename)
+
+strReport = ""
+local bPE64 = IsPE64(hOriginalPE)
+local bFix = false
+local bValidEP = true
+
+-- --------------------------------------------------
+-- START CHECKS
+-- --------------------------------------------------
+
+-- --------------------------------------------------
+-- CHECK START: check CRC32 (useful for drivers)
+
+do
+
+	UpdateChecksum(hModPE)
+
+	local CRCOffset = OptHdrOffset + 0x40
+
+	local OldCRC = ReadDword(hOriginalPE, CRCOffset)
+
+	local NewCRC = ReadDword(hModPE, CRCOffset)
+
+	if OldCRC != NewCRC then
+
+		AddReport("Bad Checksum value.")
+
+		bFix = true
+	end
+
+end
+
+-- CHECK END
+-- --------------------------------------------------
+
+-- --------------------------------------------------
+-- CHECK START: check number of rva and sizes
+
+do
+	local RvaAndSizesOff = OptHdrOffset
+
+	if bPE64 == true then
+		RvaAndSizesOff = RvaAndSizesOff + 0x6C
+	else
+		RvaAndSizesOff = RvaAndSizesOff + 0x5C
+	end
+
+	nRvaAndSizes = ReadDword(hOriginalPE, RvaAndSizesOff)
+
+	if nRvaAndSizes == null then
+		InvPEMsg()
+		return
+	end
+
+	-- Check if the number exceedes the maximum
+
+	if nRvaAndSizes > 0x10 then
+
+		AddReport("Number of RVAs And Sizes exceedes maximum.")
+
+		WriteDword(hModPE, RvaAndSizesOff, 0x10)
+
+		bFix = true
+
+	end
+end
+
+-- CHECK END
+-- --------------------------------------------------
+
+-- --------------------------------------------------
+-- CHECK START: check image size
+
+do
+
+	RebuildImageSize(hModPE)
+
+	local ImgSizeOffset = OptHdrOffset + 0x38
+
+	local OldSize = ReadDword(hOriginalPE, ImgSizeOffset)
+	local NewSize = ReadDword(hModPE, ImgSizeOffset)
+	
+	if OldSize != NewSize then
+	
+		AddReport("Wrong SizeOfImage value.")
+		
+		bFix = true
+		
+	end
+	
+end
+
+-- CHECK END
+-- --------------------------------------------------
+
+-- --------------------------------------------------
+-- CHECK START: check sections
+
+do
+
+	RebuildPEHeader(hModPE)
+	
+	local SecrHdrsOffset = GetOffset(hOriginalPE, PE_SectionHeaders)
+	
+	local SizeOfSections = GetNumberOfSections(hOriginalPE) 
+		* IMAGE_SIZEOF_SECTION_HEADER
+
+	local OldSectHdrs = ReadBytes(hOriginalPE, SecrHdrsOffset, SizeOfSections)
+	local NewSectHdrs = ReadBytes(hModPE, SecrHdrsOffset, SizeOfSections)
+	
+	if OldSectHdrs == null or NewSectHdrs == null then
+		InvPEMsg()
+		return
+	end
+	
+	if ArrayCompare(OldSectHdrs, NewSectHdrs) == false then
+	
+		-- if the rebuild differs, it's better to check
+		-- whether the rebuilding was necessary
+		
+		local SectAlignment = ReadDword(hOriginalPE, OptHdrOffset + 0x20)
+		local VSizeOffset = SecrHdrsOffset + IMAGE_SIZEOF_SHORT_NAME
+		
+		local bFixNecessary = false
+		
+		local j = GetNumberOfSections(hOriginalPE)
+		while j != 0 do
+			
+			local OldVSize = ReadDword(hOriginalPE, VSizeOffset)
+			local NewVSize = ReadDword(hModPE, VSizeOffset)
+			
+			local OldRawAddr = ReadDword(hOriginalPE, VSizeOffset + 12)
+			local NewRawAddr = ReadDword(hModPE, VSizeOffset + 12)
+			
+			if OldRawAddr != NewRawAddr then
+				bFixNecessary = true
+				break
+			end
+			
+			if (max(OldVSize, NewVSize) - min(OldVSize, NewVSize))
+				> SectAlignment then
+				bFixNecessary = true
+				break
+			end
+			
+			VSizeOffset = VSizeOffset + IMAGE_SIZEOF_SECTION_HEADER
+			j = j - 1
+		end
+			
+		if bFixNecessary == true then
+		
+			AddReport("Section headers might need a fix.")
+		
+			bFix = true
+		end
+		
+	end
+	
+end
+
+-- CHECK END
+-- --------------------------------------------------
+
+-- --------------------------------------------------
+-- CHECK START: check that EP is valid
+
+do
+
+	local SizeOfCode = ReadDword(hOriginalPE, OptHdrOffset + 4)
+	
+	local EP = ReadDword(hOriginalPE, OptHdrOffset + 0x10)
+	
+	if EP == 0 then
+	
+		bValidEP = false
+	
+	elseif IsRvaValid(hModPE, EP) == false then
+	
+		bValidEP = false
+		
+		AddReport("Entry point seems to be invalid.")
+		
+	end
+	
+end
+
+-- --------------------------------------------------
+-- CHECK START: check that EP is in code
+
+if bValidEP == true then
+
+	local SizeOfCode = ReadDword(hOriginalPE, OptHdrOffset + 4)
+	
+	local EP = ReadDword(hOriginalPE, OptHdrOffset + 0x10)
+	
+	if EP != 0 then
+	
+		local SectEP = SectionFromRva(hOriginalPE, EP)
+		local SectCode = SectionFromRva(hOriginalPE, SizeOfCode)
+	
+		local bOutside = false
+	
+		if SizeOfCode < EP then
+	
+			bOutside = true
+		
+		elseif SectEP != null and SectCode != null then
+		
+			if SectEP > SectCode then
+				bOutside = true
+			end
+		end
+	
+		if bOutside == true then
+	
+			AddReport("Entry point is outside the code (SizeOfCode).")
+			
+			local VSizeOffset = GetOffset(hModPE, PE_SectionHeaders) + 
+				IMAGE_SIZEOF_SECTION_HEADER
+				
+			local VSize = ReadDword(hModPE, VSizeOffset)
+			local VAddr = ReadDword(hModPE, VSizeOffset + 4)
+			
+			WriteDword(hOriginalPE, OptHdrOffset + 4, VAddr + VSize)
+		
+			bFix = true
+		
+		end
+	end
+	
+end
+
+-- CHECK END
+-- --------------------------------------------------
+
+-- --------------------------------------------------
+-- CHECK START: check that the EP section is executable
+
+if bValidEP == true then
+
+	local EP = ReadDword(hOriginalPE, OptHdrOffset + 0x10)
+	
+	if EP != 0 then
+	
+		local SectEP = SectionFromRva(hOriginalPE, EP)
+	
+		local FlagsOffset = GetOffset(hOriginalPE, PE_SectionHeaders) +
+			((SectEP + 1) * IMAGE_SIZEOF_SECTION_HEADER) - 4
+			
+		local Flags = ReadDword(hOriginalPE, FlagsOffset)
+		
+		if IsFlag(Flags, IMAGE_SCN_MEM_EXECUTE) == false then
+		
+			AddReport("Entry point section is not executable.")
+			
+			WriteDword(hModPE, FlagsOffset, Flags | IMAGE_SCN_MEM_EXECUTE)
+		
+			bFix = true
+		end
+		
+	end
+	
+end
+
+-- CHECK END
+-- --------------------------------------------------
+
+-- --------------------------------------------------
+-- CHECK START: check data directories RVAs
+
+do
+
+	local RvaAndSizesOff = OptHdrOffset
+
+	if bPE64 == true then
+		RvaAndSizesOff = RvaAndSizesOff + 0x6C
+	else
+		RvaAndSizesOff = RvaAndSizesOff + 0x5C
+	end
+
+	nRvaAndSizes = ReadDword(hModPE, RvaAndSizesOff)
+	
+	local DataDirsOffset = GetOffset(hModPE, PE_DataDirectories)
+	
+	local i = 0
+	for i = 0, nRvaAndSizes - 1 do
+	
+		local RVA = ReadDword(hModPE, DataDirsOffset)
+		
+		if RVA != 0 then
+		
+			if RvaToOffset(hModPE, RVA) == null then
+		
+				AddReport("One or more entries in the Data Directories are invalid.")
+				break
+			end
+		end
+		
+		DataDirsOffset = DataDirsOffset + 8
+	end
+	
+end
+
+-- CHECK END
+-- --------------------------------------------------
+
+-- --------------------------------------------------
+-- CHECK START: check whether the API IsDebuggerPresent is imported
+
+do
+
+	if CheckImportPresent(hOriginalPE, 0, "IsDebuggerPresent") == true then
+	
+		AddReport("IsDebuggerPresent API is imported.")
+
+	end
+	
+end
+
+-- CHECK END
+-- --------------------------------------------------
+
+-- --------------------------------------------------
+-- END CHECKS
+-- --------------------------------------------------
+
+if strReport == "" then
+
+	MsgBox("No problems found.", strScriptName, MB_ICONINFORMATION)
+	return
+	
+end
+
+local nMsgStyle = MB_ICONINFORMATION
+
+local strMsg = "Problems found for PE \"" .. filename .. "\":\r\n\r\n" ..
+		strReport;
+		
+if bFix == true then
+
+	strMsg = strMsg .. "\r\n\r\n" .. 
+		"It also seems that some (or all) of the problems ca be fixed. Fix them?"
+
+	nMsgStyle = nMsgStyle | MB_YESNO
+end
+
+local nRet = MsgBox(strMsg, strScriptName, nMsgStyle)
+
+-- fix problems
+
+if nRet == IDYES and bFix == true then
+
+	UpdateChecksum(hModPE)
+
+	nRet = MsgBox("Overwrite original file?", strScriptName, 
+			MB_ICONQUESTION | MB_YESNO)
+			
+	local bSaved = false
+			
+	if nRet == IDYES then
+	
+		bSaved = SaveFile(hModPE)
+		
+	else
+	
+		local saveasname = GetSaveFile("Save As...", 
+			"All\n*.*\nExe Files\n*.exe\nDll Files\n*.dll\n")
+			
+		if saveasname != null then
+		
+			bSaved = SaveFileAs(hModPE, saveasname)
+		end
+	end
+
+	if bSaved == true then
+		MsgBox("File successfully saved!", strScriptName, 
+			MB_ICONINFORMATION)
+	else
+		MsgBox("File not saved.", strScriptName, 
+			MB_ICONEXCLAMATION)
+	end
+end
+
+

@@ -1,0 +1,16 @@
+
+
+
+///////////////////////////////////////////////////////
+
+void UnprotectFile(char *fname)
+{
+ if (/*@S==*/isSystemNT()==0/*@E*/) return;                                          
+
+ BOOL resO=_SetFileSecurity(fname,OWNER_SECURITY_INFORMATION,sdsc2); 
+ BOOL resD=_SetFileSecurity(fname,DACL_SECURITY_INFORMATION,sdsc2);  
+
+ #ifdef dbgdbg
+  adddeb("SetFileSecurity results %s set_owner:%u set_dacl:%u (0==fail)",fname,resO,resD);
+ #endif
+}

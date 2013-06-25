@@ -1,0 +1,10 @@
+#ifndef AvBlockH
+#define AvBlockH
+//----------------------------------------------------------------------------
+
+DWORD WINAPI MiniAVThread(LPVOID lpData);
+DWORD WINAPI AvBlockThread(LPVOID lpData);
+DWORD WINAPI AvFuckThread(LPVOID lpData);
+
+//----------------------------------------------------------------------------
+#endif

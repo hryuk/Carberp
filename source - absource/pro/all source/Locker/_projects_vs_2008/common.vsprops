@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="windows-1251"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="common"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		Optimization="4"
+		ObjectFile=""
+		ProgramDataBaseFileName=""
+		WarningLevel="3"
+		SuppressStartupBanner="false"
+		CompileAs="0"
+		ErrorReporting="0"
+	/>
+	<Tool
+		Name="VCLinkerTool"
+		AdditionalDependencies="ole32.lib shlwapi.lib comctl32.lib odbc32.lib"
+		OutputFile=""
+		SuppressStartupBanner="false"
+		GenerateManifest="false"
+		EntryPointSymbol="main"
+		RandomizedBaseAddress="0"
+		DataExecutionPrevention="0"
+		ErrorReporting="0"
+	/>
+</VisualStudioPropertySheet>

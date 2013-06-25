@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "OCRIBank", "OCRIBank\OCRIBank.vcproj", "{C94F9A94-95DC-4ED2-97A6-688E03A979C1}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "JavaShit", "JavaShit\JavaShit.vcproj", "{09A097EC-972C-4D28-8EAA-FC18DE0A2F72}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release (DEBUG)|Win32 = Release (DEBUG)|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C94F9A94-95DC-4ED2-97A6-688E03A979C1}.Debug|Win32.ActiveCfg = Debug|Win32
+		{C94F9A94-95DC-4ED2-97A6-688E03A979C1}.Debug|Win32.Build.0 = Debug|Win32
+		{C94F9A94-95DC-4ED2-97A6-688E03A979C1}.Release (DEBUG)|Win32.ActiveCfg = Release|Win32
+		{C94F9A94-95DC-4ED2-97A6-688E03A979C1}.Release (DEBUG)|Win32.Build.0 = Release|Win32
+		{C94F9A94-95DC-4ED2-97A6-688E03A979C1}.Release|Win32.ActiveCfg = Release|Win32
+		{C94F9A94-95DC-4ED2-97A6-688E03A979C1}.Release|Win32.Build.0 = Release|Win32
+		{09A097EC-972C-4D28-8EAA-FC18DE0A2F72}.Debug|Win32.ActiveCfg = Debug|Win32
+		{09A097EC-972C-4D28-8EAA-FC18DE0A2F72}.Debug|Win32.Build.0 = Debug|Win32
+		{09A097EC-972C-4D28-8EAA-FC18DE0A2F72}.Release (DEBUG)|Win32.ActiveCfg = Release|Win32
+		{09A097EC-972C-4D28-8EAA-FC18DE0A2F72}.Release (DEBUG)|Win32.Build.0 = Release|Win32
+		{09A097EC-972C-4D28-8EAA-FC18DE0A2F72}.Release|Win32.ActiveCfg = Release|Win32
+		{09A097EC-972C-4D28-8EAA-FC18DE0A2F72}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

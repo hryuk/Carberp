@@ -1,0 +1,679 @@
+// Microsoft Visual C++ generated resource script.
+//
+#include "resource.h"
+
+#define APSTUDIO_READONLY_SYMBOLS
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 2 resource.
+//
+#include "afxres.h"
+
+/////////////////////////////////////////////////////////////////////////////
+#undef APSTUDIO_READONLY_SYMBOLS
+
+/////////////////////////////////////////////////////////////////////////////
+// Russian resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_RUS)
+#ifdef _WIN32
+LANGUAGE LANG_RUSSIAN, SUBLANG_DEFAULT
+#pragma code_page(1251)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_DIALOG_SEND_TO_FORM DIALOGEX 0, 0, 515, 335
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    PUSHBUTTON      "Cancel",IDCANCEL,458,314,50,14
+    LISTBOX         IDC_LIST1,406,311,23,17,LBS_SORT | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    EDITTEXT        IDC_EDIT2,7,292,57,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "Up",IDC_BUTTON2,95,290,22,14
+    PUSHBUTTON      "Down",IDC_BUTTON4,121,290,22,14
+    PUSHBUTTON      "send",IDC_BUTTON5,458,260,50,14
+    PUSHBUTTON      "del",IDC_BUTTON6,69,290,22,14
+    PUSHBUTTON      "RClik",IDC_BUTTON7,458,274,50,14
+    CONTROL         "OnEnter",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,309,260,43,10
+    EDITTEXT        IDC_EDIT1,7,260,188,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT3,243,258,23,12,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT4,244,271,22,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "LClik",IDC_BUTTON1,458,290,50,14
+    PUSHBUTTON      "Tab",IDC_BUTTON3,145,290,25,14
+    LTEXT           "x=",IDC_STATIC,225,263,10,8
+    LTEXT           "y=",IDC_STATIC,225,274,10,8
+    PUSHBUTTON      "WM_Scrol",IDC_BUTTON8,187,290,50,14
+    CONTROL         "",IDC_TREE1,"SysTreeView32",TVS_HASBUTTONS | TVS_HASLINES | TVS_LINESATROOT | WS_BORDER | WS_HSCROLL | WS_TABSTOP,7,7,501,248
+    CONTROL         "Is SendMessage",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,318,157,10
+END
+
+IDD_DIALOG1 DIALOGEX 0, 0, 408, 78
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Print Comand Line"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,300,57,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,351,57,50,14
+    EDITTEXT        IDC_EDIT1,90,28,311,14,ES_AUTOHSCROLL
+    COMBOBOX        IDC_COMBO1,143,7,162,30,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "Run as CreateProcess",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,7,87,10
+    CONTROL         "Run from svhost",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,17,76,10
+    EDITTEXT        IDC_EDIT2,90,42,311,14,ES_AUTOHSCROLL
+    LTEXT           "Run exe File(if NULL =IE)",IDC_STATIC_EXE,7,31,82,8
+    LTEXT           "With Comand Line",IDC_STATIC,7,45,58,8
+    CONTROL         "Run IE",IDC_IE_FF,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_TABSTOP,364,15,37,13
+    LTEXT           "Run With:",IDC_STATIC,327,17,33,8
+END
+
+IDD_DIALOG2 DIALOGEX 0, 0, 531, 258
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Go",IDOK,357,6,23,14
+    EDITTEXT        IDC_EDIT1,79,6,279,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_FULL_NAME,7,210,517,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "<--",ID_BACK,379,6,18,14
+    PUSHBUTTON      "Download",ID_DOWNLOAD,398,6,35,14
+    COMBOBOX        IDC_DRIVERS_CMB,8,6,71,30,CBS_DROPDOWNLIST | CBS_SORT | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "",IDC_LIST2,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,22,517,186
+    LTEXT           "",IDC_STATUS,7,239,517,12,SS_CENTERIMAGE,WS_EX_STATICEDGE
+    PUSHBUTTON      "Run",IDC_BUTTON1,463,6,19,14
+    PUSHBUTTON      "Find IE",ID_FIND_IE,434,6,28,14
+    PUSHBUTTON      "U L",IDC_UPLOAD_FILE,483,6,15,14
+    PUSHBUTTON      "DEL",IDC_BUTTON2,500,6,24,14
+END
+
+IDD_GATEWAY_IPS_DIALOG DIALOGEX 0, 0, 316, 180
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Gateway IPS"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,7,159,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,259,159,50,14
+    CONTROL         "",IDC_GATEWAYS,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,7,302,149
+END
+
+IDD_IP_DIALOG DIALOGEX 0, 0, 156, 42
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "IP"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,7,21,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,99,21,50,14
+    EDITTEXT        IDC_IP,7,7,142,14,ES_AUTOHSCROLL
+END
+
+IDD_RDP_INPUT_PORT DIALOGEX 0, 0, 151, 44
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,43,23,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,94,23,50,14
+    EDITTEXT        IDC_EDIT1,7,7,137,14,ES_AUTOHSCROLL
+END
+
+IDD_DIALOG4 DIALOGEX 0, 0, 316, 42
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,205,21,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,259,21,50,14
+    EDITTEXT        IDC_EDIT1,7,7,302,14,ES_AUTOHSCROLL
+END
+
+IDD_NAMEVALUE DIALOGEX 0, 0, 316, 183
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,205,162,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,259,162,50,14
+    LTEXT           "Профиль:",IDC_STATIC,7,15,34,8
+    COMBOBOX        IDB_PROFILE,43,12,175,30,CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP
+    CONTROL         "",IDLV_NAMEVALUE,"SysListView32",LVS_REPORT | LVS_SINGLESEL | LVS_SHOWSELALWAYS | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,29,302,130,WS_EX_LEFTSCROLLBAR
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO 
+BEGIN
+    IDD_DIALOG_SEND_TO_FORM, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 508
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 328
+    END
+
+    IDD_DIALOG1, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 401
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 71
+    END
+
+    IDD_DIALOG2, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 524
+        TOPMARGIN, 6
+        BOTTOMMARGIN, 251
+    END
+
+    IDD_GATEWAY_IPS_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 309
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 173
+    END
+
+    IDD_IP_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 149
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 35
+    END
+
+    IDD_RDP_INPUT_PORT, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 144
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 37
+    END
+
+    IDD_DIALOG4, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 309
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 35
+    END
+
+    IDD_NAMEVALUE, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 309
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 176
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+#endif    // Russian resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+/////////////////////////////////////////////////////////////////////////////
+// Ukrainian resources
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_UKR)
+#ifdef _WIN32
+LANGUAGE LANG_UKRAINIAN, SUBLANG_DEFAULT
+#pragma code_page(1251)
+#endif //_WIN32
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Dialog
+//
+
+IDD_ABOUTBOX DIALOGEX 0, 0, 235, 55
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "About Server"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    ICON            IDR_MAINFRAME,IDC_STATIC,11,17,20,20
+    LTEXT           "Server Version 1.0",IDC_STATIC,40,10,119,8,SS_NOPREFIX
+    LTEXT           "Copyright (C) 2010",IDC_STATIC,40,25,119,8
+    DEFPUSHBUTTON   "OK",IDOK,178,7,50,16,WS_GROUP
+END
+
+IDD_SERVER_DIALOG DIALOGEX 0, 0, 578, 151
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_VISIBLE | WS_CAPTION | WS_SYSMENU
+EXSTYLE WS_EX_APPWINDOW
+CAPTION "Server"
+FONT 8, "MS Shell Dlg", 0, 0, 0x1
+BEGIN
+    LTEXT           "Filter:",IDC_STATIC,6,6,24,12,SS_CENTERIMAGE
+    EDITTEXT        IDC_FILTER,42,6,186,12,ES_AUTOHSCROLL
+    PUSHBUTTON      "Apply filter",IDC_APPLY_FILTER,234,6,48,12
+    PUSHBUTTON      "Reset filter",IDC_RESET_FILTER,289,6,48,12
+    DEFPUSHBUTTON   "Open client",IDOK,342,6,54,12
+    PUSHBUTTON      "Exit",IDCANCEL,401,7,24,12
+    CONTROL         "",IDC_KLIENT,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,19,562,125
+END
+
+IDD_CLIENT_DIALOG DIALOGEX 0, 0, 570, 202
+STYLE DS_SETFONT | DS_FIXEDSYS | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_CLIPCHILDREN | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME
+EXSTYLE WS_EX_STATICEDGE | WS_EX_APPWINDOW
+CAPTION "Client"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    CONTROL         "",IDC_CLIENTVIEW,"MFCClientViewCtrl",WS_VSCROLL | WS_HSCROLL | WS_TABSTOP,7,11,556,115
+    LTEXT           "Available windows:",IDC_STATIC1,7,126,63,8
+    LISTBOX         IDC_LIST1,7,133,257,51,LBS_OWNERDRAWVARIABLE | LBS_HASSTRINGS | LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    LTEXT           "Log:",IDC_STATIC2,275,126,18,8
+    LISTBOX         IDC_LOG_LIST,275,133,288,51,LBS_NOINTEGRALHEIGHT | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Grab Window",IDC_HOOK_APP,183,0,49,11
+    LTEXT           "",IDC_STATUS,7,184,556,12,SS_CENTERIMAGE,WS_EX_STATICEDGE
+    PUSHBUTTON      "1",IDC_CMD_DESK_1,7,0,27,11
+    PUSHBUTTON      "2",IDC_CMD_DESK_2,35,0,26,11
+    LTEXT           "1",IDC_STATIC_DESK,70,1,8,8
+    PUSHBUTTON      "Refresh list",IDC_REFRESH_BTN,87,0,41,11
+    PUSHBUTTON      "Go To Second",IDC_SS,296,0,57,11
+    CONTROL         "sound",IDC_MOVE,"Button",BS_AUTOCHECKBOX | BS_PUSHLIKE | WS_TABSTOP,373,0,35,10
+    PUSHBUTTON      "Download Personal Config",IDC_DConfig,411,0,115,11
+END
+
+IDD_KEYS_DIALOG DIALOGEX 0, 0, 311, 102
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Send keystroke"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    LTEXT           "Keystroke:",IDC_STATIC1,6,6,96,8
+    EDITTEXT        IDC_KEYSTROKE,7,16,297,12,ES_AUTOHSCROLL
+    CONTROL         "Append Enter key",IDC_APPEND_ENTER,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,33,73,10
+    DEFPUSHBUTTON   "Send",IDOK,250,30,54,18
+    PUSHBUTTON      "Cancel",IDCANCEL,250,77,54,17
+    PUSHBUTTON      "Up",IDC_BUTTON1,79,43,27,14
+    PUSHBUTTON      "Down",IDC_BUTTON2,79,68,27,14
+    PUSHBUTTON      "Del",IDC_BUTTON3,49,56,23,14
+    EDITTEXT        IDC_EDIT1,7,56,40,14,ES_AUTOHSCROLL
+    PUSHBUTTON      "RButtonClick",IDC_BUTTON4,250,52,54,17
+    CONTROL         "Refresh Window",IDC_CHECK1,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,85,149,10
+    CONTROL         "IsSend",IDC_CHECK2,"Button",BS_AUTOCHECKBOX | WS_TABSTOP,7,73,38,10
+    COMBOBOX        IDC_JAVAFIELDS,141,31,104,30,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    COMBOBOX        IDC_JAVAVALUES,141,53,104,30,CBS_DROPDOWN | WS_VSCROLL | WS_TABSTOP
+    PUSHBUTTON      "Payment Order No",IDC_PAYMENT_ORDER_NO,153,71,80,17
+END
+
+IDD_SERVER_OPTIONS_DIALOG DIALOGEX 0, 0, 114, 51
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Server Options"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    RTEXT           "Port number:",IDC_STATIC,6,6,54,12,SS_CENTERIMAGE
+    EDITTEXT        IDC_PORT_NUMBER,66,6,40,12,ES_AUTOHSCROLL
+    DEFPUSHBUTTON   "OK",IDOK,12,30,42,12
+    PUSHBUTTON      "Cancel",IDCANCEL,60,30,42,12
+END
+
+IDD_OPTS_DIALOG DIALOGEX 0, 0, 167, 175
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Set client options"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "Set",IDOK,7,150,54,18
+    PUSHBUTTON      "Cancel",IDCANCEL,106,150,54,18
+    EDITTEXT        IDC_EDIT2,85,7,47,14,ES_AUTOHSCROLL
+    LTEXT           "Auto Update timeout",IDC_STATIC,14,10,68,8
+    EDITTEXT        IDC_EDIT3,85,28,48,14,ES_AUTOHSCROLL
+    LTEXT           "Sleep",IDC_STATIC,42,34,18,8
+    EDITTEXT        IDC_EDIT1,7,54,153,15,ES_AUTOHSCROLL
+    LTEXT           "Comments",IDC_STATIC,7,45,34,8
+    EDITTEXT        IDC_EDIT4,7,78,153,14,ES_AUTOHSCROLL
+    EDITTEXT        IDC_EDIT5,7,100,153,14,ES_AUTOHSCROLL
+    LTEXT           "Title window turn on",IDC_STATIC,7,69,66,8
+    LTEXT           "Process Name",IDC_STATIC,7,92,46,8
+    EDITTEXT        IDC_EDIT6,7,126,153,14,ES_AUTOHSCROLL
+    LTEXT           "Class Name",IDC_STATIC,7,116,38,8
+END
+
+IDD_PROCESS_DIALOG DIALOGEX 0, 0, 299, 364
+STYLE DS_SETFONT | DS_MODALFRAME | DS_FIXEDSYS | WS_POPUP | WS_CAPTION | WS_SYSMENU
+CAPTION "Dialog"
+FONT 8, "MS Shell Dlg", 400, 0, 0x1
+BEGIN
+    DEFPUSHBUTTON   "OK",IDOK,7,343,50,14
+    PUSHBUTTON      "Cancel",IDCANCEL,242,343,50,14
+    CONTROL         "",IDC_PROCESS_LIST2,"SysListView32",LVS_REPORT | LVS_ALIGNLEFT | WS_BORDER | WS_TABSTOP,7,7,285,335
+    PUSHBUTTON      "KILL",IDC_KILLPROC,79,343,50,14
+    PUSHBUTTON      "kill ie FF Opera",IDC_KILL_IE_FF_OPERA,153,343,57,14
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// DESIGNINFO
+//
+
+#ifdef APSTUDIO_INVOKED
+GUIDELINES DESIGNINFO 
+BEGIN
+    IDD_ABOUTBOX, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 228
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 48
+    END
+
+    IDD_SERVER_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 569
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 144
+    END
+
+    IDD_CLIENT_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 563
+        BOTTOMMARGIN, 196
+    END
+
+    IDD_KEYS_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 304
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 95
+    END
+
+    IDD_SERVER_OPTIONS_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 107
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 44
+    END
+
+    IDD_OPTS_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 160
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 168
+    END
+
+    IDD_PROCESS_DIALOG, DIALOG
+    BEGIN
+        LEFTMARGIN, 7
+        RIGHTMARGIN, 292
+        TOPMARGIN, 7
+        BOTTOMMARGIN, 357
+    END
+END
+#endif    // APSTUDIO_INVOKED
+
+
+#ifdef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// TEXTINCLUDE
+//
+
+1 TEXTINCLUDE 
+BEGIN
+    "resource.h\0"
+END
+
+2 TEXTINCLUDE 
+BEGIN
+    "#include ""afxres.h""\r\n"
+    "\0"
+END
+
+3 TEXTINCLUDE 
+BEGIN
+    "#define _AFX_NO_SPLITTER_RESOURCES\r\n"
+    "#define _AFX_NO_OLE_RESOURCES\r\n"
+    "#define _AFX_NO_TRACKER_RESOURCES\r\n"
+    "#define _AFX_NO_PROPERTY_RESOURCES\r\n"
+    "\r\n"
+    "#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_UKR)\r\n"
+    "LANGUAGE 34, 1\r\n"
+    "#pragma code_page(1251)\r\n"
+    "#include ""res\\Server.rc2""  // non-Microsoft Visual C++ edited resources\r\n"
+    "#include ""afxres.rc""     // Standard components\r\n"
+    "#endif\r\n"
+    "\0"
+END
+
+#endif    // APSTUDIO_INVOKED
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Icon
+//
+
+// Icon with lowest ID value placed first to ensure application icon
+// remains consistent on all systems.
+IDR_MAINFRAME           ICON                    "res\\Server.ico"
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Version
+//
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 1,0,0,1
+ PRODUCTVERSION 1,0,0,1
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x4L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904e4"
+        BEGIN
+            VALUE "CompanyName", "TODO: <Company name>"
+            VALUE "FileDescription", "TODO: <File description>"
+            VALUE "FileVersion", "1.0.0.1"
+            VALUE "InternalName", "Server.exe"
+            VALUE "LegalCopyright", "TODO: (c) <Company name>.  All rights reserved."
+            VALUE "OriginalFilename", "Server.exe"
+            VALUE "ProductName", "TODO: <Product name>"
+            VALUE "ProductVersion", "1.0.0.1"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x409, 1252
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Accelerator
+//
+
+IDR_ACCELERATOR1 ACCELERATORS 
+BEGIN
+    VK_F4,          ID_ACCELERATOR32771,    VIRTKEY, NOINVERT
+    VK_F5,          ID_ACCELERATOR32772,    VIRTKEY, NOINVERT
+    VK_ESCAPE,      ID_ACCELERATOR32774,    VIRTKEY, NOINVERT
+    VK_SPACE,       ID_ACCELERATOR32806,    VIRTKEY, CONTROL, NOINVERT
+    VK_SPACE,       ID_ACCELERATOR32812,    VIRTKEY, SHIFT, CONTROL, NOINVERT
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// Menu
+//
+
+IDR_MENU1 MENU 
+BEGIN
+    POPUP "Comand"
+    BEGIN
+        MENUITEM "Maximize",                    ID_COMAND_MAXIMIZE
+        MENUITEM "Minimize",                    ID_COMAND_MINIMIZE
+        MENUITEM "Hide",                        ID_COMAND_HIDE
+        MENUITEM "Show",                        ID_COMAND_SHOW
+        MENUITEM SEPARATOR
+        MENUITEM "Remote Reboot",               ID_COMAND_REMOTEREBOOT
+        MENUITEM "Remote reboot2",              ID_COMAND_REMOTEREBOOT2
+        MENUITEM "Refresh Window ",             ID_COMAND_REFRESHWINDOW
+        MENUITEM "Close Window",                ID_COMAND_CLOSEWINDOW
+        MENUITEM "run exe",                     ID_COMAND_RUNEXE
+        MENUITEM SEPARATOR
+        MENUITEM "Close SB",                    ID_COMAND_CLOSE_SB
+    END
+    POPUP "tools"
+    BEGIN
+        MENUITEM "FileExplorer",                ID_TOOLS_FILEEXPLORER
+        MENUITEM "WindowComponentExplorer",     ID_TOOLS_WINDOWCOMPONENTEXPLORER
+        MENUITEM "ProcessExplorer",             ID_TOOLS_PROCESSEXPLORER
+        MENUITEM SEPARATOR
+        MENUITEM "PathTempSRV(Path)",           ID_TOOLS_PATHTEMPSRV
+        MENUITEM SEPARATOR
+        MENUITEM "AutoLogon Check",             ID_TOOLS_AUTOLOGONCHECK
+        MENUITEM "Autologon ON",                ID_TOOLS_AUTOLOGONON, INACTIVE
+        MENUITEM SEPARATOR
+        MENUITEM "RunIE",                       ID_TOOLS_RUNIE
+    END
+    POPUP "Windows"
+    BEGIN
+        MENUITEM "Is FullScrin F5",             ID_ISFULLSCRIN_ISFULLSCRINF5
+        MENUITEM "FullClose ESC",               ID_WINDOWS_FULLCLOSE
+        MENUITEM SEPARATOR
+        MENUITEM "SnapShot F4",                 ID_WINDOWS_SHOPSHOTF4
+        MENUITEM "SnapShot CurWin CTRL+Space",  ID_WINDOWS_SNAPSHOTCURENTWINDOWF3
+    END
+    POPUP "Options"
+    BEGIN
+        MENUITEM "Set ProgramOpnions",          ID_OPTIONS_PROGRAM
+        MENUITEM SEPARATOR
+        MENUITEM "DBClick",                     ID_OPTIONS_DBCLICK
+        MENUITEM "AutoUpdate",                  ID_OPTIONS_AUTOUPDATE
+        MENUITEM "DellFile",                    ID_OPTIONS_DELLFILE
+        MENUITEM "Full list of windows",        ID_OPTIONS_FULLLISTOFWINDOWS
+        MENUITEM "Hide From Second Desc",       ID_OPTIONS_HIDEFROMSECONDDESC
+    END
+    POPUP "Java"
+    BEGIN
+        MENUITEM "Hide(Show)JavaTray",          ID_JAVA_HIDESHOWJAVATRAY
+        MENUITEM "Hook(UnHook)",                ID_JAVA_HOOK
+        MENUITEM "MoveJava",                    ID_JAVA_MOVEJAVA, CHECKED
+    END
+    POPUP "RDP"
+    BEGIN
+        MENUITEM "CreateVPN(XXX)",              ID_VPN_CREATEVPN
+        MENUITEM "CreateVPN Manualy",           ID_RDP_CREATEVPNMANUALY
+        MENUITEM "ConnectVPN(XXX1)",            ID_VPN_CONNECTVPN
+        MENUITEM "DisconnectVPN(XXX0)",         ID_VPN_DISCONNECTVPN
+        MENUITEM "Connection State",            ID_RDP_CONNECTIONSTATE
+        MENUITEM "DeleteVPN",                   ID_RDP_DELETEVPN
+        MENUITEM SEPARATOR
+        MENUITEM "SetPassword",                 ID_VPN_SETPASSWORS
+        MENUITEM SEPARATOR
+        POPUP "RDP"
+        BEGIN
+            MENUITEM "Start",                       ID_RDP_LOADDLL
+            MENUITEM "Stop",                        ID_RDP_CLOSEDLL
+        END
+        POPUP "VNC"
+        BEGIN
+            MENUITEM "Start",                       ID_VNC_START
+            MENUITEM "Stop",                        ID_VNC_STOP
+        END
+        POPUP "PortForWarding"
+        BEGIN
+            MENUITEM "PortForw",                    ID_RDP_PORTFORW
+            MENUITEM "vnc(5900)",                   ID_PORTFORWARDING_VNC
+            MENUITEM "Rdp(3389)",                   ID_PORTFORWARDING_RDP
+        END
+    END
+END
+
+IDR_MENU2 MENU 
+BEGIN
+    POPUP "Comand"
+    BEGIN
+        MENUITEM "Maximize",                    ID_COMAND_MAXIMIZE
+        MENUITEM "Minimize",                    ID_COMAND_MINIMIZE
+        MENUITEM "Hide",                        ID_COMAND_HIDE
+        MENUITEM SEPARATOR
+        MENUITEM "Remote Reboot",               ID_COMAND_REMOTEREBOOT
+        MENUITEM "Remote reboot2",              ID_COMAND_REMOTEREBOOT2
+        MENUITEM "Refresh Window ",             ID_COMAND_REFRESHWINDOW
+        MENUITEM "Close Window",                ID_COMAND_CLOSEWINDOW
+        MENUITEM SEPARATOR
+        MENUITEM "Close SB",                    ID_COMAND_CLOSE_SB
+    END
+    POPUP "tools"
+    BEGIN
+        MENUITEM "FileExplorer",                ID_TOOLS_FILEEXPLORER
+        MENUITEM "ProcessExplorer",             ID_TOOLS_PROCESSEXPLORER
+        MENUITEM "RunIE",                       ID_TOOLS_RUNIE
+    END
+    POPUP "Windows"
+    BEGIN
+        MENUITEM "Is FullScrin F5",             ID_ISFULLSCRIN_ISFULLSCRINF5
+        MENUITEM "FullClose ESC",               ID_WINDOWS_FULLCLOSE
+    END
+    POPUP "Options"
+    BEGIN
+        MENUITEM "Set ProgramOpnions",          ID_OPTIONS_PROGRAM
+        MENUITEM "DBClick",                     ID_OPTIONS_DBCLICK
+        MENUITEM "AutoUpdate",                  ID_OPTIONS_AUTOUPDATE
+        MENUITEM "DellFile",                    ID_OPTIONS_DELLFILE
+        MENUITEM "Full list of windows",        ID_OPTIONS_FULLLISTOFWINDOWS
+        MENUITEM "Hide From Second Desc",       ID_OPTIONS_HIDEFROMSECONDDESC, CHECKED
+    END
+END
+
+
+/////////////////////////////////////////////////////////////////////////////
+//
+// String Table
+//
+
+STRINGTABLE 
+BEGIN
+    IDS_ABOUTBOX            "&About Server..."
+    IDP_SOCKETS_INIT_FAILED "Windows sockets initialization failed."
+END
+
+#endif    // Ukrainian resources
+/////////////////////////////////////////////////////////////////////////////
+
+
+
+#ifndef APSTUDIO_INVOKED
+/////////////////////////////////////////////////////////////////////////////
+//
+// Generated from the TEXTINCLUDE 3 resource.
+//
+#define _AFX_NO_SPLITTER_RESOURCES
+#define _AFX_NO_OLE_RESOURCES
+#define _AFX_NO_TRACKER_RESOURCES
+#define _AFX_NO_PROPERTY_RESOURCES
+
+#if !defined(AFX_RESOURCE_DLL) || defined(AFX_TARG_UKR)
+LANGUAGE 34, 1
+#pragma code_page(1251)
+#include "res\Server.rc2"  // non-Microsoft Visual C++ edited resources
+#include "afxres.rc"     // Standard components
+#endif
+
+/////////////////////////////////////////////////////////////////////////////
+#endif    // not APSTUDIO_INVOKED
+

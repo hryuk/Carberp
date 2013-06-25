@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_layout_file>
+	<ActiveTarget name="Release x86" />
+	<File name="includes.h" open="1" top="0" tabpos="6">
+		<Cursor position="347" topLine="0" />
+	</File>
+	<File name="injlib\injlib.h" open="1" top="1" tabpos="7">
+		<Cursor position="153" topLine="0" />
+	</File>
+</CodeBlocks_layout_file>

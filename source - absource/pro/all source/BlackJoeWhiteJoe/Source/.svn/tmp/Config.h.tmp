@@ -1,0 +1,49 @@
+#ifndef ConfigH
+#define ConfigH
+//----------------------------------------------------------------------------
+
+#include <windows.h>
+
+//********************************************************************
+//
+//  Определите имя DEBUGCONFIG если необходимо что-бы бот
+//  использовал отладочные настройки
+//
+//********************************************************************
+
+
+
+#if !defined(DEBUGCONFIG) && defined(DEBUGBOT)
+	#define DEBUGCONFIG
+#endif
+
+// Константы, номера скриптов
+
+const BYTE  ScriptConfig = 1;       // Путь для загрузки конфигурационного файла
+const BYTE  ScriptFormGrabber = 2;  // Скрипт отправки данных HTML форм
+const BYTE  ScriptLoader = 3;       // Скрипт загрузки задач и обновлений
+const BYTE  ScriptPlugins = 4;      // Скрипт загрузки плагинов
+
+
+char *GetCurrentHost();
+PCHAR GetCurrentHost2();
+
+PCHAR GetBotScriptURL(BYTE Script);
+
+int GetDelay();
+
+void InstallConfig();
+bool DownloadCfg( char *Url );
+char *GetPrefix();
+
+/// Функции добавленные(в hайл) при добавлении RuBnk
+PCHAR GetMainHostByID(BYTE ID);
+
+// В отладочном режиме предоставляем возможность установить отладочный хост
+#ifdef DEBUGCONFIG
+void SetDebugHost(PCHAR Host);
+#endif
+
+//----------------------------------------------------------------------------
+#endif
+

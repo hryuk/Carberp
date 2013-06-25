@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes" ?>
+<CodeBlocks_workspace_file>
+	<Workspace title="RemoteCtl workspace">
+		<Project filename="autofill/autofill.cbp" />
+		<Project filename="Server/Server.cbp" />
+		<Project filename="DrClient/DrClient.cbp" active="1" />
+		<Project filename="CliStart/CliStart.cbp" />
+		<Project filename="LicServer/LicServer.cbp" />
+		<Project filename="PicServer/PicServer.cbp" />
+	</Workspace>
+</CodeBlocks_workspace_file>

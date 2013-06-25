@@ -1,0 +1,6 @@
+LIBRARY	"bot.plug"
+EXPORTS 
+	Start;
+	SetBotParameter;
+	SFFD = StartFromFakeDll;
+	StartInjector;

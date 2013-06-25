@@ -1,0 +1,53 @@
+K 25
+svn:wc:ra_dav:version-url
+V 53
+/svn/BlackJoe/!svn/ver/204/WhiteJOE_Serg/trunk/Source
+END
+GetApi.h
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/BlackJoe/!svn/ver/169/WhiteJOE_Serg/trunk/Source/GetApi.h
+END
+Utils.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 63
+/svn/BlackJoe/!svn/ver/173/WhiteJOE_Serg/trunk/Source/Utils.cpp
+END
+Config.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/BlackJoe/!svn/ver/181/WhiteJOE_Serg/trunk/Source/Config.cpp
+END
+bsssign.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 65
+/svn/BlackJoe/!svn/ver/182/WhiteJOE_Serg/trunk/Source/bsssign.cpp
+END
+BotEvents.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 67
+/svn/BlackJoe/!svn/ver/174/WhiteJOE_Serg/trunk/Source/BotEvents.cpp
+END
+GetApi.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 64
+/svn/BlackJoe/!svn/ver/169/WhiteJOE_Serg/trunk/Source/GetApi.cpp
+END
+Config.h
+K 25
+svn:wc:ra_dav:version-url
+V 62
+/svn/BlackJoe/!svn/ver/175/WhiteJOE_Serg/trunk/Source/Config.h
+END
+VideoRecorder.cpp
+K 25
+svn:wc:ra_dav:version-url
+V 71
+/svn/BlackJoe/!svn/ver/176/WhiteJOE_Serg/trunk/Source/VideoRecorder.cpp
+END

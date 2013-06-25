@@ -1,0 +1,29 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 10.00
+# Visual Studio 2008
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DllLoader", "DllLoader\DllLoader.vcproj", "{810C63B9-536B-466B-9F7E-845B544CF610}"
+	ProjectSection(ProjectDependencies) = postProject
+		{6AC23DEE-288C-441D-83E3-DFF9C8980909} = {6AC23DEE-288C-441D-83E3-DFF9C8980909}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "DllInject", "DllInject\DllInject.vcproj", "{6AC23DEE-288C-441D-83E3-DFF9C8980909}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{810C63B9-536B-466B-9F7E-845B544CF610}.Debug|Win32.ActiveCfg = Debug|Win32
+		{810C63B9-536B-466B-9F7E-845B544CF610}.Debug|Win32.Build.0 = Debug|Win32
+		{810C63B9-536B-466B-9F7E-845B544CF610}.Release|Win32.ActiveCfg = Release|Win32
+		{810C63B9-536B-466B-9F7E-845B544CF610}.Release|Win32.Build.0 = Release|Win32
+		{6AC23DEE-288C-441D-83E3-DFF9C8980909}.Debug|Win32.ActiveCfg = Debug|Win32
+		{6AC23DEE-288C-441D-83E3-DFF9C8980909}.Debug|Win32.Build.0 = Debug|Win32
+		{6AC23DEE-288C-441D-83E3-DFF9C8980909}.Release|Win32.ActiveCfg = Release|Win32
+		{6AC23DEE-288C-441D-83E3-DFF9C8980909}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

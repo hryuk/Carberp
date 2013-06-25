@@ -1,0 +1,21 @@
+
+#ifndef ddosH
+#define ddosH
+//----------------------------------------------------------------------------
+
+#include "windows.h"
+#include "Strings.h"
+#include "Memory.h"
+#include "Utils.h"
+#include "Config.h"
+#include "Loader.h"
+#include "GetApi.h"
+#include "DllLoader.h"
+
+bool ExecuteDDOSCommand(LPVOID Manager, PCHAR Command, PCHAR Args);
+
+const char CommandDDOS[] = "ddos\0";//
+
+
+//----------------------------------------------------------------------------
+#endif

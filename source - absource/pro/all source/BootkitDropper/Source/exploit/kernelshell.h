@@ -1,0 +1,23 @@
+#ifndef _KERNELSHELL_H_
+#define _KERNELSHELL_H_
+
+#define ALIGN_DOWN(x, align) (x &~ (align - 1))
+#define ALIGN_UP(x, align) ((x & (align - 1)) ? ALIGN_DOWN(x, align) + align:x)
+#define RVA_TO_VA(B,O) ((PCHAR)(((PCHAR)(B)) + ((ULONG_PTR)(O))))
+#define VA_TO_RVA(B,P) ((ULONG)(((PCHAR)(P)) - ((PCHAR)(B))))
+#define MAKE_PTR(B,O,T) (T)(RVA_TO_VA(B,O))
+#define RtlOffsetToPointer(B, O) ((PCHAR)(((PCHAR)(B)) + ((ULONG_PTR)(O))))
+
+extern BOOL bKernelCode;
+
+PVOID KernelGetProcAddrEx(ULONG ModuleBase, ULONG Function);
+
+VOID KernelGetSystemPrivileges();
+
+ULONG GetKernelBase(void);
+
+NTSTATUS SetSystemToken();
+
+
+
+#endif 

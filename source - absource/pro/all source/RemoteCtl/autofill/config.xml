@@ -1,0 +1,57 @@
+<filler>
+    <form>
+        <url>*wasm.ru/forum/register.php</url>
+        <id>register</id>
+
+        <element>
+            <name>req_username</name>
+            <type>text</type>
+            <value>Васёк</value>
+        </element>
+
+        <element>
+            <name>req_email1</name>
+            <type>text</type>
+            <value>vasya@mail.ru</value>
+        </element>
+
+        <element>
+            <name>req_email2</name>
+            <type>text</type>
+            <value>vasya@mail.ru</value>
+        </element>
+
+        <element>
+            <name>req_captcha</name>
+            <type>text</type>
+            <value>123456</value>
+        </element>
+
+        <element>
+            <name>timezone</name>
+            <type>select</type>
+            <value>-12</value>
+        </element>
+
+        <element>
+            <name>language</name>
+            <type>select</type>
+            <value>english</value>
+        </element>
+
+        <element>
+            <name>email_setting</name>
+            <type>radio</type>
+            <value>2</value>
+        </element>
+
+        <element>
+            <name>save_pass</name>
+            <type>checkbox</type>
+            <value>1</value>
+            <state>0</state>
+        </element>
+    </form>
+</filler>
+
+
