@@ -109,7 +109,7 @@ void FinalizeSections( PMEMORYMODULE module )
 
 		if ( size > 0 )
 		{
-			if ( pVirtualProtect((LPVOID)section->Misc.PhysicalAddress, section->SizeOfRawData, protect, &oldProtect) == 0 )
+			if ( pVirtualProtect((LPVOID)section->Misc.PhysicalAddress, size, protect, &oldProtect) == 0 )
 			{
 				return;
 			}
